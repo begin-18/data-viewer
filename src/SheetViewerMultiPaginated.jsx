@@ -6,6 +6,7 @@ import Sidebar from "./components/Sidebar";
 import TableView from "./components/TableView";
 import GraphView from "./components/GraphView";
 import FaultSummary from "./components/FaultSummary";
+import About from "./components/About";
 import { parseGvizText, pick, normalizeTimestampToParts } from "./utils";
 import { FiActivity, FiCheckCircle, FiThermometer } from "react-icons/fi";
 
@@ -209,6 +210,7 @@ export default function SheetViewerMultiPaginated() {
           )}
           {activeTab==="Graph" && <GraphView faultCounts={faultCounts} currentTheme={currentTheme} />}
           {activeTab==="Fault Summary" && <FaultSummary faultCounts={faultCounts} theme={theme} currentTheme={currentTheme} />}
+          {activeTab==="About" && <About currentTheme={currentTheme} />}
         </main>
       </div>
     </div>

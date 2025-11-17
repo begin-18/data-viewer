@@ -1,7 +1,8 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 
 export default function Sidebar({ activeTab, setActiveTab, setCurrentPage, currentTheme }) {
-  const mainTabs = ["Data Overview", "Comparative Analysis", "Fault Summary"];
+  const mainTabs = ["Data Overview", "Comparative Analysis", "Fault Summary", "About"];
   const subTabsAllData = ["Thermal Data", "Acoustic Data", "Vibration Data"];
   const subTabsComparisons = [
     "Vibration × Acoustic",
@@ -20,7 +21,19 @@ export default function Sidebar({ activeTab, setActiveTab, setCurrentPage, curre
   };
 
   return (
-    <aside style={{ width: 210, flex: "0 0 220px", overflowY: "auto", borderRight: `1px solid ${currentTheme.border}`, background: currentTheme.sidebarBg, borderRadius: 12, padding: "12px 0" }}>
+    <aside style={{
+      width: 210,
+      flex: "0 0 220px",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "space-between",
+      overflowY: "auto",
+      borderRight: `1px solid ${currentTheme.border}`,
+      background: currentTheme.sidebarBg,
+      borderRadius: 12,
+      padding: "12px 0"
+    }}>
+      {/* Main Tabs */}
       <nav style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {mainTabs.map(tab => (
           <div key={tab}>
@@ -143,6 +156,27 @@ export default function Sidebar({ activeTab, setActiveTab, setCurrentPage, curre
             )}
           </div>
         ))}
+
+        {/* Home button at the bottom */}
+      <div style={{ marginBottom: 12 }}>
+        <Link to="/" style={{ textDecoration: "none" }}>
+          <button style={{
+            width: "95%",
+            padding: "16px 15px",
+            textAlign: "center",
+            borderRadius: 12,
+            border: activeTab === "Home" ? `2px solid #2563eb` : `1px solid ${currentTheme.border}`,
+            background: activeTab === "Home" ? "#2563eb20" : currentTheme.sidebarBg,
+            cursor: "pointer",
+            fontWeight: activeTab === "Home" ? 700 : 500,
+            color: activeTab === "Home" ? "#1d4ed8" : currentTheme.textColor,
+            transition: "all 0.2s",
+            fontSize: 16,
+          }}>
+            Home
+          </button>
+        </Link>
+      </div>
       </nav>
     </aside>
   );

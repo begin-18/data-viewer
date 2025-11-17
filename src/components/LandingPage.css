@@ -1,0 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+
+/* Apply Google Font globally */
+.landing-container {
+  font-family: 'Roboto', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 0 1.5rem;
+  background: linear-gradient(to bottom right, #111827, #1f2937, #374151);
+  color: white;
+  text-align: center;
+}
+
+/* Hero Title */
+.hero-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 768px) {
+  .hero-title {
+    font-size: 3rem;
+  }
+}
+
+/* Hero Description */
+.hero-description {
+  color: #d1d5db;
+  max-width: 600px;
+  margin-bottom: 2rem;
+  font-size: 1.1rem;
+}
+
+/* Dashboard Button */
+.view-dashboard-button {
+  display: inline-block;
+  background-color: #3b82f6;
+  color: white;
+  padding: 0.75rem 2rem;
+  border-radius: 9999px;
+  font-size: 1.125rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: transform 0.3s, background-color 0.3s;
+}
+
+.view-dashboard-button:hover {
+  background-color: #2563eb;
+  transform: scale(1.05);
+}
+
+/* Features Grid */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+  margin-top: 4rem;
+}
+
+@media (min-width: 768px) {
+  .features-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Feature Item */
+.feature-item {
+  text-align: center;
+}
+
+.feature-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Icon Colors */
+.feature-icon.blue { color: #3b82f6; }
+.feature-icon.green { color: #22c55e; }
+.feature-icon.yellow { color: #eab308; }
+.feature-icon.purple { color: #a78bfa; }

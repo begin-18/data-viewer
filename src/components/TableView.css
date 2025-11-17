@@ -1,0 +1,14 @@
+.severity-normal {
+  color: green;
+  font-weight: bold;
+}
+
+.severity-warning {
+  color: orange;
+  font-weight: bold;
+}
+
+.severity-critical {
+  color: red;
+  font-weight: bold;
+}

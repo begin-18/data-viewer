@@ -1,3 +1,4 @@
+// src/components/TableView.jsx
 import React from "react";
 import PaginationControls from "./PaginationControls";
 
@@ -16,9 +17,16 @@ export default function TableView({
 }) {
   const tableAreaHeight = `calc(103vh - 212px)`;
 
+  // Map fault_type to icon and color
+  const faultTypeMap = {
+    normal: { color: "green", icon: "✅" },
+    imbalance: { color: "orange", icon: "⚠️" },
+    "bearing fault": { color: "red", icon: "⚙️" },
+    overheating: { color: "red", icon: "🌡️" }
+  };
+
   return (
     <div style={{ background: currentTheme.tableBg, borderRadius: 12, overflow: "hidden", border: `1px solid ${currentTheme.border}`, flex: "1 1 auto", display: "flex", flexDirection: "column" }}>
-      
       <div style={{ overflowY: "auto", height: tableAreaHeight }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead style={{ position: "sticky", top: 0, background: currentTheme.tableHeader, zIndex: 2 }}>
@@ -35,11 +43,22 @@ export default function TableView({
             {pageRows.map((r, i) => (
               <tr key={r._idx} style={{ borderBottom: `1px solid ${currentTheme.border}`, background: i % 2 === 0 ? currentTheme.tableBg : "#2563eb05" }}>
                 <td style={{ padding: 12, fontWeight: 500 }}>{(currentPage - 1) * pageSize + i + 1}</td>
-                {displayCols.map(col => (
-                  <td key={col} style={{ padding: 12, color: currentTheme.tableText }}>
-                    {r[col] ?? ""}
-                  </td>
-                ))}
+                {displayCols.map(col => {
+                  if(col === "fault_type") {
+                    const ft = (r[col] || "unknown").toLowerCase();
+                    const { color, icon } = faultTypeMap[ft] || { color: "gray", icon: "❔" };
+                    return (
+                      <td key={col} style={{ padding: 12, color, fontWeight: 600 }}>
+                        {r[col]} {icon}
+                      </td>
+                    );
+                  }
+                  return (
+                    <td key={col} style={{ padding: 12, color: currentTheme.tableText }}>
+                      {r[col] ?? ""}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
