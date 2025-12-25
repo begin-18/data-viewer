@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import axios from 'axios';
 
 // IMPORTANT: Ensure this matches your Node.js server URL and route
-const API_URL = 'http://localhost:5000/api/upload-data';
+const API_URL = 'https://thesis-data-gl06.onrender.com/api/upload-data';
+
 
 const DropZone = ({ dataType, allowedExtensions }) => {
     const [dragging, setDragging] = useState(false);

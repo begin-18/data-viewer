@@ -11,7 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // --- Middleware setup ---
-app.use(cors({ origin: 'http://localhost:5173' })); 
+app.use(cors({ origin: 'https://begin-18.github.io/data-viewer/viewer' })); 
 app.use(express.json());
 
 // Multer setup: use memory storage to handle the file buffer
@@ -191,5 +191,5 @@ app.post('/api/upload-data', upload.single('file'), async (req, res) => {
 
 
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on ${PORT}`);
 });
