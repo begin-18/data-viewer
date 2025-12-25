@@ -10,8 +10,13 @@ const XLSX = require('xlsx');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+
+
+
 // --- Middleware setup ---
-app.use(cors({ origin: 'https://begin-18.github.io/data-viewer/viewer' })); 
+app.use(cors({
+  origin: 'https://begin-18.github.io',
+}));
 app.use(express.json());
 
 // Multer setup: use memory storage to handle the file buffer
