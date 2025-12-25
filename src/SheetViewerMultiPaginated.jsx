@@ -1,4 +1,4 @@
-// src/SheetViewerMultiPaginated.jsx
+// SheetViewerMultiPaginated.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import Header from "./components/Header";
@@ -7,6 +7,8 @@ import TableView from "./components/TableView";
 import GraphView from "./components/GraphView";
 import FaultSummary from "./components/FaultSummary";
 import About from "./components/About";
+// IMPORT NEW UPLOAD PAGE COMPONENT
+import DataUploadPage from "./components/DataUploadZone"; 
 import { parseGvizText, pick, normalizeTimestampToParts } from "./utils";
 import { FiActivity, FiCheckCircle, FiThermometer } from "react-icons/fi";
 
@@ -31,7 +33,7 @@ const TAB_CONFIG = {
 export default function SheetViewerMultiPaginated() {
   const [allRows,setAllRows] = useState([]);
   const [loading,setLoading] = useState(true);
-  const [activeTab,setActiveTab] = useState("Thermal Data");
+  const [activeTab,setActiveTab] = useState("Thermal Data"); 
   const [pageSize,setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [currentPage,setCurrentPage] = useState(1);
   const [theme,setTheme] = useState("light");
@@ -120,6 +122,9 @@ export default function SheetViewerMultiPaginated() {
 
   // ---------- Prepare rows for table ----------
   const rows = useMemo(()=>{
+    // Check if we are on the data upload tab; if so, return an empty array
+    if (activeTab === "Data Upload & Processing") return []; 
+    
     if(activeTab==="Vibration × Acoustic"){
       return mergedRows.map(r=>({
         timestamp:r.timestamp,
@@ -193,6 +198,13 @@ export default function SheetViewerMultiPaginated() {
           ]}
         />
         <main style={{flex:"1 1 auto",display:"flex",flexDirection:"column",gap:12}}>
+          
+          {/* RENDER DATA UPLOAD PAGE */}
+          {activeTab === "Data Upload" && (
+            <DataUploadPage currentTheme={currentTheme} />
+          )}
+
+          {/* RENDER TABLE VIEW (Only show TableView if activeTab is a data or comparison view) */}
           {["Thermal Data","Acoustic Data","Vibration Data","All Data","Vibration × Acoustic","Vibration × Thermal","Vibration × Acoustic × Thermal"].includes(activeTab) && (
             <TableView
               pageRows={pageRows}
@@ -208,6 +220,8 @@ export default function SheetViewerMultiPaginated() {
               btnStyle={btnStyle}
             />
           )}
+          
+          {/* RENDER OTHER VIEWS */}
           {activeTab==="Graph" && <GraphView faultCounts={faultCounts} currentTheme={currentTheme} />}
           {activeTab==="Fault Summary" && <FaultSummary faultCounts={faultCounts} theme={theme} currentTheme={currentTheme} />}
           {activeTab==="About" && <About currentTheme={currentTheme} />}

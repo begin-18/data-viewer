@@ -1,14 +1,19 @@
+// src/components/Sidebar.jsx
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 
 export default function Sidebar({ activeTab, setActiveTab, setCurrentPage, currentTheme }) {
-  const mainTabs = ["Data Overview", "Comparative Analysis", "Fault Summary", "About"];
+  // ADDED "DATA UPLOAD & PROCESSING" to the main tabs array
+  const mainTabs = ["Data Overview", "Comparative Analysis", "Fault Summary", "Data Upload", "About"];
+  
   const subTabsAllData = ["Thermal Data", "Acoustic Data", "Vibration Data"];
   const subTabsComparisons = [
     "Vibration × Acoustic",
     "Vibration × Thermal",
     "Vibration × Acoustic × Thermal"
   ];
+
+  const UPLOAD_PAGE_TITLE = "Data Upload";
 
   const [activeSubTab, setActiveSubTab] = useState(subTabsAllData[0]);
   const [allDataOpen, setAllDataOpen] = useState(false);
@@ -33,51 +38,83 @@ export default function Sidebar({ activeTab, setActiveTab, setCurrentPage, curre
       borderRadius: 12,
       padding: "12px 0"
     }}>
-      {/* Main Tabs */}
-      <nav style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {/* Main Tabs Container */}
+      <nav style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
         {mainTabs.map(tab => (
           <div key={tab}>
-            <button
-              onClick={() => {
-                if(tab === "Data Overview") {
-                  setAllDataOpen(prev => !prev);
-                  setComparisonsOpen(false);
-                  setActiveTab(activeSubTab);
-                  setCurrentPage(1);
-                } else if(tab === "Comparative Analysis") {
-                  setComparisonsOpen(prev => !prev);
-                  setAllDataOpen(false);
-                  setActiveTab(activeSubTab);
-                  setCurrentPage(1);
-                } else {
+            
+            {/* Conditional Rendering for DATA UPLOAD & PROCESSING (as a regular button) */}
+            {tab === UPLOAD_PAGE_TITLE ? (
+              <button
+                onClick={() => {
                   setAllDataOpen(false);
                   setComparisonsOpen(false);
-                  setActiveTab(tab);
+                  setActiveTab(tab); // This sets the state to render DataUploadPage
                   setCurrentPage(1);
-                }
-              }}
-              style={{
-                width: "95%",
-                padding: "16px 15px",
-                textAlign: "right",
-                borderRadius: 12,
-                border: activeTab === tab ? `2px solid #2563eb` : `1px solid ${currentTheme.border}`,
-                background: activeTab === tab ? "#2563eb20" : currentTheme.sidebarBg,
-                cursor: "pointer",
-                fontWeight: activeTab === tab ? 700 : 500,
-                color: activeTab === tab ? "#1d4ed8" : currentTheme.textColor,
-                transition: "all 0.2s",
-                fontSize: 16,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between"
-              }}
-            >
-              <span>{tab}</span>
-              {(tab === "Data Overview" || tab === "Comparative Analysis") && (
-                <span>{(tab === "Data Overview" ? allDataOpen : comparisonsOpen) ? "▲" : "▼"}</span>
-              )}
-            </button>
+                }}
+                style={{
+                  width: "95%",
+                  padding: "16px 15px",
+                  textAlign: "left",
+                  borderRadius: 12,
+                  border: activeTab === tab ? `2px solid #2563eb` : `1px solid ${currentTheme.border}`,
+                  background: activeTab === tab ? "#2563eb20" : currentTheme.sidebarBg,
+                  cursor: "pointer",
+                  fontWeight: activeTab === tab ? 700 : 500,
+                  color: activeTab === tab ? "#1d4ed8" : currentTheme.textColor,
+                  transition: "all 0.2s",
+                  fontSize: 16,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between"
+                }}
+              >
+                <span>{tab}</span>
+              </button>
+            ) : (
+              // Original logic for all other main tabs (Data Overview, Comparative Analysis, Fault Summary, About)
+              <button
+                onClick={() => {
+                  if(tab === "Data Overview") {
+                    setAllDataOpen(prev => !prev);
+                    setComparisonsOpen(false);
+                    setActiveTab(activeSubTab); 
+                    setCurrentPage(1);
+                  } else if(tab === "Comparative Analysis") {
+                    setComparisonsOpen(prev => !prev);
+                    setAllDataOpen(false);
+                    setActiveTab(activeSubTab); 
+                    setCurrentPage(1);
+                  } else {
+                    setAllDataOpen(false);
+                    setComparisonsOpen(false);
+                    setActiveTab(tab); // Set active tab directly
+                    setCurrentPage(1);
+                  }
+                }}
+                style={{
+                  width: "95%",
+                  padding: "16px 15px",
+                  textAlign: "right",
+                  borderRadius: 12,
+                  border: activeTab === tab ? `2px solid #2563eb` : `1px solid ${currentTheme.border}`,
+                  background: activeTab === tab ? "#2563eb20" : currentTheme.sidebarBg,
+                  cursor: "pointer",
+                  fontWeight: activeTab === tab ? 700 : 500,
+                  color: activeTab === tab ? "#1d4ed8" : currentTheme.textColor,
+                  transition: "all 0.2s",
+                  fontSize: 16,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between"
+                }}
+              >
+                <span>{tab}</span>
+                {(tab === "Data Overview" || tab === "Comparative Analysis") && (
+                  <span>{(tab === "Data Overview" ? allDataOpen : comparisonsOpen) ? "▲" : "▼"}</span>
+                )}
+              </button>
+            )}
 
             {/* Data Overview sub-tabs */}
             {tab === "Data Overview" && allDataOpen && (
@@ -158,7 +195,7 @@ export default function Sidebar({ activeTab, setActiveTab, setCurrentPage, curre
         ))}
 
         {/* Home button at the bottom */}
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 12, marginTop: 460 }}>
         <Link to="/" style={{ textDecoration: "none" }}>
           <button style={{
             width: "95%",

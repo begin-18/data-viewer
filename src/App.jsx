@@ -7,9 +7,9 @@ function App() {
   return (
     <BrowserRouter basename="/data-viewer">
       <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/viewer" element={<SheetViewerMultiPaginated />} />
-      </Routes>
+        <Route index element={<LandingPage />} />
+  <Route path="/viewer" element={<SheetViewerMultiPaginated />} />
+    </Routes>
     </BrowserRouter>
   );
 }
