@@ -8,7 +8,6 @@ import GraphView from "./components/GraphView";
 import LineChart from "./components/LineChart";
 import FaultSummary from "./components/FaultSummary";
 import About from "./components/About";
-// IMPORT NEW UPLOAD PAGE COMPONENT
 import DataUploadPage from "./components/DataUploadZone"; 
 import { parseGvizText, pick, normalizeTimestampToParts } from "./utils";
 import { FiActivity, FiCheckCircle, FiThermometer } from "react-icons/fi";
@@ -18,6 +17,15 @@ ChartJS.register(ArcElement, Tooltip, Legend);
 const SHEET_ID = "1wDkNRGrKvYehMI4f8Ks4RLoncGHrs7xWDg8Dy2d5Tk8";
 const POLL_MS = 0;
 const DEFAULT_PAGE_SIZE = 100;
+
+// ONLY ADDITION: Rounding to 8 decimals
+const roundTo8Decimals = (val) => {
+  if (val === null || val === undefined || val === "") return 0;
+  const num = parseFloat(val);
+  if (isNaN(num)) return val;
+  // This rounds the last digit based on the 9th decimal
+  return Number(num.toFixed(8)).toString();
+};
 
 const TAB_CONFIG = {
   "Thermal Data": { valueKeys: ["temperature","temp","temp_c","temperature_c","temperature (c)"], displayColumns: ["timestamp","temperature","fault_type"] },
@@ -30,7 +38,6 @@ const TAB_CONFIG = {
   }
 };
 
-// Main component
 export default function SheetViewerMultiPaginated() {
   const [allRows,setAllRows] = useState([]);
   const [loading,setLoading] = useState(true);
@@ -38,6 +45,7 @@ export default function SheetViewerMultiPaginated() {
   const [pageSize,setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [currentPage,setCurrentPage] = useState(1);
   const [theme,setTheme] = useState("light");
+  const [mergedRows,setMergedRows] = useState([]);
 
   const themes = {
     light: {
@@ -59,7 +67,6 @@ export default function SheetViewerMultiPaginated() {
     color:"#fff", cursor:"pointer", fontWeight:600, transition:"all 0.2s"
   };
 
-  // Fetch sheet tab
   async function fetchSheetTab(tabName) {
     const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}`;
     const res = await fetch(url);
@@ -67,7 +74,6 @@ export default function SheetViewerMultiPaginated() {
     return parseGvizText(text);
   }
 
-  // Fetch all tabs
   async function fetchAll() {
     setLoading(true);
     try {
@@ -82,17 +88,17 @@ export default function SheetViewerMultiPaginated() {
           const {date:ts_date,time:ts_time} = normalizeTimestampToParts(rawTs);
           const timestamp = `${ts_date} / ${ts_time}`;
           const fault_type = pick(r, ["fault_type","fault type","fault","faulttype","fault-type"]);
+          
           if(tab==="Thermal Data"){
-            normalized.push({_tab:tab,_idx:`${tab}#${i}`,timestamp,ts_date,ts_time,temperature:pick(r,cfg.valueKeys||[]),fault_type,_raw:r});
+            normalized.push({_tab:tab,_idx:`${tab}#${i}`,timestamp,ts_date,ts_time,temperature:roundTo8Decimals(pick(r,cfg.valueKeys||[])),fault_type,_raw:r});
           } else if(tab==="Acoustic Data"){
-            normalized.push({_tab:tab,_idx:`${tab}#${i}`,timestamp,ts_date,ts_time,acoustic_level:pick(r,cfg.valueKeys||[]),fault_type,_raw:r});
+            normalized.push({_tab:tab,_idx:`${tab}#${i}`,timestamp,ts_date,ts_time,acoustic_level:roundTo8Decimals(pick(r,cfg.valueKeys||[])),fault_type,_raw:r});
           } else if(tab==="Vibration Data"){
-            normalized.push({_tab:tab,_idx:`${tab}#${i}`,timestamp,ts_date,ts_time,vibration_x:pick(r,cfg.vibXKeys||[]),vibration_y:pick(r,cfg.vibYKeys||[]),vibration_z:pick(r,cfg.vibZKeys||[]),fault_type,_raw:r});
+            normalized.push({_tab:tab,_idx:`${tab}#${i}`,timestamp,ts_date,ts_time,vibration_x:roundTo8Decimals(pick(r,cfg.vibXKeys||[])),vibration_y:roundTo8Decimals(pick(r,cfg.vibYKeys||[])),vibration_z:roundTo8Decimals(pick(r,cfg.vibZKeys||[])),fault_type,_raw:r});
           }
         });
       });
 
-      // Merge rows by timestamp for comparisons
       const mergedByTimestamp = {};
       normalized.forEach(r=>{
         if(!mergedByTimestamp[r.timestamp]) mergedByTimestamp[r.timestamp]={timestamp:r.timestamp};
@@ -103,7 +109,6 @@ export default function SheetViewerMultiPaginated() {
           mergedByTimestamp[r.timestamp].vibration_y = r.vibration_y;
           mergedByTimestamp[r.timestamp].vibration_z = r.vibration_z;
         }
-        // optional: keep latest fault_type
         mergedByTimestamp[r.timestamp].fault_type = r.fault_type || mergedByTimestamp[r.timestamp].fault_type;
       });
 
@@ -114,18 +119,13 @@ export default function SheetViewerMultiPaginated() {
     finally { setLoading(false); }
   }
 
-  const [mergedRows,setMergedRows] = useState([]);
-
   useEffect(()=>{
     fetchAll();
     if(POLL_MS>0){ const id=setInterval(fetchAll,POLL_MS); return()=>clearInterval(id); }
   },[]);
 
-  // ---------- Prepare rows for table ----------
   const rows = useMemo(()=>{
-    // Check if we are on the data upload tab; if so, return an empty array
-    if (activeTab === "Data Upload & Processing") return []; 
-    
+    if (activeTab === "Data Upload") return []; 
     if(activeTab==="Vibration × Acoustic"){
       return mergedRows.map(r=>({
         timestamp:r.timestamp,
@@ -152,10 +152,8 @@ export default function SheetViewerMultiPaginated() {
   },[allRows,mergedRows,activeTab]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length/pageSize));
-  useEffect(()=>{ if(currentPage>totalPages)setCurrentPage(totalPages); if(currentPage<1)setCurrentPage(1); },[totalPages,currentPage]);
   const pageRows = useMemo(()=>rows.slice((currentPage-1)*pageSize,(currentPage-1)*pageSize+pageSize),[rows,currentPage,pageSize]);
 
-  // Display columns for each comparison tab
   const displayCols = useMemo(()=>{
     if(activeTab==="Vibration × Acoustic") return ["timestamp","vibration_x","vibration_y","vibration_z","acoustic_level","fault_type"];
     if(activeTab==="Vibration × Thermal") return ["timestamp","vibration_x","vibration_y","vibration_z","temperature","fault_type"];
@@ -181,8 +179,6 @@ export default function SheetViewerMultiPaginated() {
     return counts;
   },[allRows]);
 
-  const iconMap = { "Thermal Data":<FiThermometer size={20}/>, "Acoustic Data":<FiCheckCircle size={20}/>, "Vibration Data":<FiActivity size={20}/> };
-
   return (
     <div style={{fontFamily:"Inter,system-ui,Arial",height:"100vh",overflow:"hidden",display:"flex",flexDirection:"column",background:currentTheme.background,color:currentTheme.textColor}}>
       <Header theme={theme} setTheme={setTheme} currentTheme={currentTheme} />
@@ -199,13 +195,10 @@ export default function SheetViewerMultiPaginated() {
           ]}
         />
         <main style={{flex:"1 1 auto",display:"flex",flexDirection:"column",gap:12}}>
-          
-          {/* RENDER DATA UPLOAD PAGE */}
           {activeTab === "Data Upload" && (
             <DataUploadPage currentTheme={currentTheme} />
           )}
 
-          {/* RENDER TABLE VIEW (Only show TableView if activeTab is a data or comparison view) */}
           {["Thermal Data","Acoustic Data","Vibration Data","All Data","Vibration × Acoustic","Vibration × Thermal","Vibration × Acoustic × Thermal"].includes(activeTab) && (
             <TableView
               pageRows={pageRows}
@@ -222,9 +215,8 @@ export default function SheetViewerMultiPaginated() {
             />
           )}
           
-          {/* RENDER OTHER VIEWS */}
           {activeTab==="Graph" && <GraphView faultCounts={faultCounts} currentTheme={currentTheme} />}
-          {activeTab==="Line Chart" && <LineChart faultCounts={faultCounts} currentTheme={currentTheme} />}
+          {activeTab==="Line Chart" && <LineChart currentTheme={currentTheme} />}
           {activeTab==="Fault Summary" && <FaultSummary faultCounts={faultCounts} theme={theme} currentTheme={currentTheme} />}
           {activeTab==="About" && <About currentTheme={currentTheme} />}
         </main>
