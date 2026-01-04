@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 export default function Sidebar({ activeTab, setActiveTab, setCurrentPage, currentTheme }) {
   // ADDED "DATA UPLOAD & PROCESSING" to the main tabs array
-  const mainTabs = ["Data Overview", "Comparative Analysis", "Fault Summary", "Data Upload", "About"];
+  const mainTabs = ["Data Overview", "Comparative Analysis", "Fault Summary", "Line Chart", "Data Upload", "About"];
   
   const subTabsAllData = ["Thermal Data", "Acoustic Data", "Vibration Data"];
   const subTabsComparisons = [
@@ -33,8 +33,6 @@ export default function Sidebar({ activeTab, setActiveTab, setCurrentPage, curre
       flexDirection: "column",
       justifyContent: "space-between",
       overflowY: "auto",
-      borderRight: `1px solid ${currentTheme.border}`,
-      background: currentTheme.sidebarBg,
       borderRadius: 12,
       padding: "12px 0"
     }}>
@@ -195,12 +193,12 @@ export default function Sidebar({ activeTab, setActiveTab, setCurrentPage, curre
         ))}
 
         {/* Home button at the bottom */}
-      <div style={{ marginBottom: 12, marginTop: 460 }}>
+      <div style={{ marginBottom: 12 }}>
         <Link to="/" style={{ textDecoration: "none" }}>
           <button style={{
             width: "95%",
             padding: "16px 15px",
-            textAlign: "center",
+            textAlign: "left",
             borderRadius: 12,
             border: activeTab === "Home" ? `2px solid #2563eb` : `1px solid ${currentTheme.border}`,
             background: activeTab === "Home" ? "#2563eb20" : currentTheme.sidebarBg,

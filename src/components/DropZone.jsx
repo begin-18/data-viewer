@@ -1,22 +1,28 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-// IMPORTANT: Ensure this matches your Node.js server URL and route
 const API_URL = 'https://thesis-data-gl06.onrender.com/api/upload-data';
 
-
-const DropZone = ({ dataType, allowedExtensions }) => {
+// Added currentTheme to props
+const DropZone = ({ dataType, allowedExtensions, currentTheme }) => {
     const [dragging, setDragging] = useState(false);
     const [file, setFile] = useState(null);
-    const [status, setStatus] = useState(''); // 'success', 'error', 'loading'
+    const [status, setStatus] = useState(''); 
     const [message, setMessage] = useState('');
+
+    // Logic for colors based on theme
+    const isDark = currentTheme?.isDark || false; 
+    const bgColor = dragging 
+        ? (isDark ? 'rgba(59, 130, 246, 0.2)' : '#f0f8ff') 
+        : (currentTheme?.cardBg || '#f9f9f9');
+    
+    const textColor = currentTheme?.textColor || '#333';
+    const borderColor = dragging ? '#3b82f6' : (currentTheme?.borderColor || '#ccc');
 
     const handleFileDrop = (droppedFile) => {
         if (!droppedFile) return;
-
         const extension = droppedFile.name.split('.').pop().toLowerCase();
         
-        // Clear previous state
         setStatus('');
         setMessage('');
         
@@ -29,96 +35,65 @@ const DropZone = ({ dataType, allowedExtensions }) => {
 
         setFile(droppedFile);
         setMessage(`File selected: ${droppedFile.name}. Attempting upload...`);
-        // Trigger upload immediately as per your original logic
         uploadFile(droppedFile); 
     };
 
     const uploadFile = async (fileToUpload) => {
         setStatus('loading');
-
         const formData = new FormData();
         formData.append('file', fileToUpload);
         formData.append('dataType', dataType); 
 
         try {
             const response = await axios.post(API_URL, formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
+                headers: { 'Content-Type': 'multipart/form-data' },
             });
-            
-            // This runs ONLY if the server returns a 2xx status code
             setStatus('success');
-            setFile(null); // Clear file only on confirmed success
-            setMessage(response.data.message || `Successfully uploaded ${fileToUpload.name} to Google Sheets.`);
-            
+            setFile(null);
+            setMessage(response.data.message || `Successfully uploaded ${fileToUpload.name}.`);
         } catch (error) {
-            // This runs if the server returns a non-2xx status code (e.g., 400 or 500)
             setStatus('error');
-            
-            let errorMessage = 'Upload failed. Check server logs.';
-            
+            let errorMessage = 'Upload failed.';
             if (error.response) {
-                // Server returned a status code, so we know the request reached the server.
-                const serverStatus = error.response.status;
-                const serverMessage = error.response.data?.message;
-                
-                // Refined message to indicate the potential success of data writing.
-                errorMessage = serverMessage 
-                    ? `Server Error (${serverStatus}): ${serverMessage}. Data may still be written in Google Sheet.`
-                    : `Upload failed (Status ${serverStatus}). Data may still be written in Google Sheet.`;
+                errorMessage = `Server Error (${error.response.status}): ${error.response.data?.message || 'Check logs'}`;
             } else if (error.request) {
-                // The request was made but no response was received (network issue/CORS)
-                errorMessage = 'Upload failed: No response received from server. Check network or CORS settings.';
+                errorMessage = 'No response from server. Check network.';
             }
-
             setMessage(errorMessage);
-            console.error('Upload Error:', error);
         }
     };
 
-    const handleDragOver = (e) => {
-        e.preventDefault();
-        setDragging(true);
-    };
-
-    const handleDragLeave = () => {
-        setDragging(false);
-    };
-
-    const handleDrop = (e) => {
-        e.preventDefault();
-        setDragging(false);
-        const droppedFile = e.dataTransfer.files[0];
-        handleFileDrop(droppedFile);
-    };
-
     const StatusIndicator = () => {
-        if (status === 'loading') return <div style={{ color: 'blue' }}>⏳ {message}</div>;
-        if (status === 'success') return <div style={{ color: 'green' }}>✅ {message}</div>;
-        // The error message now suggests checking the Google Sheet
-        if (status === 'error') return <div style={{ color: 'red' }}>❌ {message}</div>;
+        if (status === 'loading') return <div style={{ color: '#3b82f6', marginTop: '10px', fontSize: '13px' }}>⏳ {message}</div>;
+        if (status === 'success') return <div style={{ color: '#10b981', marginTop: '10px', fontSize: '13px' }}>✅ {message}</div>;
+        if (status === 'error') return <div style={{ color: '#ef4444', marginTop: '10px', fontSize: '13px' }}>❌ {message}</div>;
         return null;
     };
 
     return (
         <div 
-            className={`drop-zone ${dataType.toLowerCase()} ${dragging ? 'dragging' : ''}`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => { e.preventDefault(); setDragging(false); handleFileDrop(e.dataTransfer.files[0]); }}
             style={{
-                border: `2px dashed ${dragging ? '#007bff' : '#ccc'}`,
-                padding: '25px',
+                border: `2px dashed ${borderColor}`,
+                padding: '30px 20px',
                 textAlign: 'center',
                 margin: '15px 0',
-                borderRadius: '10px',
-                backgroundColor: dragging ? '#f0f8ff' : '#f9f9f9',
-                transition: '0.2s',
+                borderRadius: '15px',
+                backgroundColor: bgColor,
+                transition: 'all 0.3s ease',
+                boxShadow: isDark ? '0 4px 15px rgba(0,0,0,0.3)' : '0 4px 10px rgba(0,0,0,0.05)'
             }}
         >
-            <h3 style={{ margin: '0 0 10px 0', color: '#333' }}>{dataType} DATA</h3>
-            <p>Drag & drop your file here, or click to browse.</p>
+            <h3 style={{ margin: '0 0 8px 0', color: textColor, fontSize: '16px', fontWeight: '800' }}>
+                {dataType} DATA
+            </h3>
+            
+            <p style={{ color: textColor, opacity: 0.7, fontSize: '13px', marginBottom: '15px' }}>
+                Drag & drop or browse
+            </p>
+
             <input 
                 type="file" 
                 onChange={(e) => handleFileDrop(e.target.files[0])} 
@@ -126,9 +101,19 @@ const DropZone = ({ dataType, allowedExtensions }) => {
                 id={`file-upload-${dataType}`}
                 accept={allowedExtensions.map(ext => `.${ext}`).join(',')}
             />
+            
             <label 
                 htmlFor={`file-upload-${dataType}`} 
-                style={{ cursor: 'pointer', color: '#007bff', textDecoration: 'underline' }}
+                style={{ 
+                    cursor: 'pointer', 
+                    color: '#3b82f6', 
+                    fontWeight: 'bold', 
+                    fontSize: '14px',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    background: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)',
+                    border: '1px solid rgba(59, 130, 246, 0.2)'
+                }}
             >
                 Browse File
             </label>

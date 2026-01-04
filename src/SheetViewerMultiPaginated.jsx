@@ -5,6 +5,7 @@ import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 import TableView from "./components/TableView";
 import GraphView from "./components/GraphView";
+import LineChart from "./components/LineChart";
 import FaultSummary from "./components/FaultSummary";
 import About from "./components/About";
 // IMPORT NEW UPLOAD PAGE COMPONENT
@@ -223,6 +224,7 @@ export default function SheetViewerMultiPaginated() {
           
           {/* RENDER OTHER VIEWS */}
           {activeTab==="Graph" && <GraphView faultCounts={faultCounts} currentTheme={currentTheme} />}
+          {activeTab==="Line Chart" && <LineChart faultCounts={faultCounts} currentTheme={currentTheme} />}
           {activeTab==="Fault Summary" && <FaultSummary faultCounts={faultCounts} theme={theme} currentTheme={currentTheme} />}
           {activeTab==="About" && <About currentTheme={currentTheme} />}
         </main>

@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { BarChart3, Database, Search, Zap } from "lucide-react";
+import { BarChart3, Database, GitMerge, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 import "./LandingPage.css";
 
@@ -52,9 +52,9 @@ const LandingPage = () => {
           <Database className="feature-icon green" />
           <p>Connect Sheets</p>
         </div>
-        <div className="feature-item">
-          <Search className="feature-icon yellow" />
-          <p>Filter & Search</p>
+       <div className="feature-item">
+          <GitMerge className="feature-icon yellow" />
+          <p>Sensor Fusion</p>
         </div>
         <div className="feature-item">
           <Zap className="feature-icon purple" />
