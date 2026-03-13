@@ -14,7 +14,6 @@ const PORT = process.env.PORT || 5000;
 // --- Middleware setup ---
 app.use(cors({
     origin: [
-    'http://localhost:5173',
     'https://begin-18.github.io'
   ]
 }));
