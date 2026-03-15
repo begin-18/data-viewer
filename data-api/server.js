@@ -6,12 +6,11 @@ const { google } = require('googleapis');
 const { spawnSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const XLSX = require('xlsx'); // Added for CSV/XLSX support
+const XLSX = require('xlsx');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// FIXED: Explicit CORS for GitHub Pages
 app.use(cors({
   origin: "https://begin-18.github.io",
   methods: ["GET", "POST"],
@@ -21,7 +20,6 @@ app.use(cors({
 app.use(express.json());
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Google Sheets Setup
 const auth = new google.auth.JWT({
   email: process.env.CLIENT_EMAIL,
   key: process.env.PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -29,7 +27,6 @@ const auth = new google.auth.JWT({
 });
 const sheets = google.sheets({ version: 'v4', auth });
 
-// SHEET MAPPING based on your UI categories
 const SHEET_MAP = {
   vibration: "Vibration Data",
   acoustic: "Acoustic Data",
@@ -43,7 +40,8 @@ app.post('/api/upload-data', upload.single('file'), async (req, res) => {
   const sensorType = req.body.sensorType?.toLowerCase() || 'vibration';
   const targetSheetName = SHEET_MAP[sensorType] || "New Data Storage";
 
-  let row = [new Date().toLocaleString('en-GB'), fileExt.toUpperCase()];
+  // Column A: Date and Time
+  let row = [new Date().toLocaleString('en-GB')];
 
   try {
     // --- BRANCH 1: SPREADSHEETS (CSV/XLSX) ---
@@ -52,9 +50,14 @@ app.post('/api/upload-data', upload.single('file'), async (req, res) => {
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
       const data = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
       
-      // Pull first 6 columns from the second row of the spreadsheet
       if (data[1]) {
-        row.push(...data[1].slice(0, 6)); 
+        if (sensorType === 'vibration') {
+          // Vibration: [Timestamp, Vib_X, Vib_Y, Vib_Z, Fault_Type] (5 columns total)
+          row.push(...data[1].slice(0, 4)); 
+        } else {
+          // Thermal/Acoustic: [Timestamp, Value, Fault_Type] (3 columns total)
+          row.push(...data[1].slice(0, 2)); 
+        }
       }
     } 
     
@@ -66,41 +69,38 @@ app.post('/api/upload-data', upload.single('file'), async (req, res) => {
       const pyScript = fileExt === '.tdms' ? 'read_tdms.py' : 'read_file.py';
       const py = spawnSync('python3', [path.join(__dirname, pyScript), tempPath]);
       const output = py.stdout?.toString().trim();
-      const errorOutput = py.stderr?.toString().trim();
-
+      
       if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
 
-      if (errorOutput || !output) {
-        row.push(`API_ERROR: ${errorOutput || 'No Python Output'}`);
-      } else {
+      if (output) {
         try {
           const result = JSON.parse(output);
-          row.push(
-            result.RMS, 
-            result.Kurtosis, 
-            result.Skewness, 
-            result.Peak_Amplitude, 
-            result.Temperature,
-            result.Status
-          );
+          if (sensorType === 'vibration') {
+            row.push(result.Vib_X, result.Vib_Y, result.Vib_Z, result.Fault_Type);
+          } else if (sensorType === 'thermal') {
+            row.push(result.Temperature, result.Fault_Type);
+          } else if (sensorType === 'acoustic') {
+            row.push(result.Acoustic_Level, result.Fault_Type);
+          }
         } catch (e) {
           row.push("JSON_PARSE_ERROR");
         }
+      } else {
+        row.push("PYTHON_ERROR");
       }
     }
 
-    // Append to the specific target sheet based on sensor type
+    // --- SAVE TO GOOGLE SHEETS ---
     await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.SHEET_ID,
-      range: `'${targetSheetName}'!A:H`,
+      range: `'${targetSheetName}'!A:E`, // Range A:E covers up to 5 columns
       valueInputOption: 'USER_ENTERED',
       resource: { values: [row] },
     });
 
-    res.status(200).json({ message: `Saved to ${targetSheetName}`, data: row });
+    res.status(200).json({ message: `Successfully saved to ${targetSheetName}`, data: row });
 
   } catch (err) {
-    console.error("Server Error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
