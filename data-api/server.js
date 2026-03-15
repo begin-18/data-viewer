@@ -14,6 +14,7 @@ app.use(cors());
 app.use(express.json());
 const upload = multer({ storage: multer.memoryStorage() });
 
+// Google Sheets Setup
 const auth = new google.auth.JWT({
   email: process.env.CLIENT_EMAIL,
   key: process.env.PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -29,23 +30,29 @@ app.post('/api/upload-data', upload.single('file'), async (req, res) => {
   fs.writeFileSync(tempPath, req.file.buffer);
 
   try {
-    // RUN PYTHON
+    // Attempt to run Python
     const py = spawnSync('python3', [path.join(__dirname, 'read_file.py'), tempPath]);
     const output = py.stdout?.toString().trim();
     const errorOutput = py.stderr?.toString().trim();
 
     if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
 
-    let row = [new Date().toLocaleString()];
+    let row = [new Date().toLocaleString('en-GB')];
 
     if (errorOutput || !output) {
-      // IF PYTHON FAILS: Write the error to the sheet so we can see it
-      row.push("PY_ERROR: " + (errorOutput || "No Output"));
+      // Log the specific Python error to Column B so you can see it in Google Sheets
+      row.push(`API_ERROR: ${errorOutput || 'No Python Output'}`);
+      console.error("Python Error:", errorOutput);
     } else {
-      const result = JSON.parse(output);
-      row.push(result.RMS, result.Kurtosis, result.Skewness, result.Peak_Amplitude, result.Temperature);
+      try {
+        const result = JSON.parse(output);
+        row.push(result.RMS, result.Kurtosis, result.Skewness, result.Peak_Amplitude, result.Temperature);
+      } catch (e) {
+        row.push("JSON_PARSE_ERROR");
+      }
     }
 
+    // Append to Google Sheets
     await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.SHEET_ID,
       range: `'${TARGET_SHEET}'!A:F`,
@@ -53,12 +60,13 @@ app.post('/api/upload-data', upload.single('file'), async (req, res) => {
       resource: { values: [row] },
     });
 
-    res.status(200).json({ message: 'Processed', data: row });
+    res.status(200).json({ message: 'Process finished', data: row });
 
   } catch (err) {
+    console.error("Server Error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/', (req, res) => res.send('API LIVE'));
-app.listen(PORT, () => console.log(`Server on ${PORT}`));
+app.get('/', (req, res) => res.send('Thesis API Status: Online'));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
