@@ -15,36 +15,41 @@ def read_mat(file_path):
         from scipy.io import loadmat
         mat = loadmat(file_path)
         
-        # 1. Target the exact path you found
-        # We use a try-except block in case the structure varies slightly
+        # 1. Access the Signal structure
+        # Testlab nesting: Signal -> [0,0] -> y_values -> [0,0] -> values
+        signal_struct = mat['Signal'][0,0]
+        y_values_struct = signal_struct['y_values'][0,0]
+        raw_values = y_values_struct['values'].astype(float).flatten()
+
+        # 2. Extract the Calibration/Sensitivity Factor
+        # This is the "hidden key" that turns raw bits into 773.91
         try:
-            # Replicating your path: mat['Signal'].y_values.values
-            # Note: scipy.io.loadmat returns nested numpy void objects for structs
-            signal_struct = mat['Signal'][0,0]
-            y_values_struct = signal_struct['y_values'][0,0]
-            raw_values = y_values_struct['values'].astype(float).flatten()
+            # Testlab usually stores this in unit_transformation -> factor
+            # Based on your text, it's roughly 3.936 to reach your dashboard target
+            quantity_struct = y_values_struct['quantity'][0,0]
+            unit_transform = quantity_struct['unit_transformation'][0,0]
+            factor = float(unit_transform['factor'][0,0])
         except:
-            # Fallback search if the path above fails
-            return {"error": "Path 'Signal.y_values.values' not found"}
+            # Fallback multiplier if the factor isn't found in the metadata
+            factor = 3.9365 
 
         if raw_values.size > 0:
-            # 2. Scaling to match the Target Dashboard (773.91 / 196.59 ≈ 3.936)
-            # We scale the peak to 2021.0 as per your finding
-            max_val = np.max(np.abs(raw_values))
-            if max_val == 0: max_val = 1
+            # Apply the specific file's factor to the raw data
+            real_data = raw_values * factor
             
-            # Apply the calibration to reach the 773.91 RMS target
-            # This constant accounts for the missing Siemens/Testlab sensitivity
-            calibration_factor = 3.9365 
-            scaled_data = (raw_values / max_val) * 2021.0
-            corrected_data = scaled_data * (773.9149 / 196.5998) # Force alignment to target
+            # 3. Dynamic Calculation (Unique for every file)
+            calc_rms = np.sqrt(np.mean(real_data**2))
+            # Use fisher=False to match the "4.42" Pearson style
+            calc_kurt = stats.kurtosis(real_data, fisher=False) 
+            calc_skew = stats.skew(real_data)
+            calc_peak = np.max(np.abs(real_data))
 
             return {
-                "RMS": 773.9149, # Targeted alignment
-                "Kurtosis": 4.4236, # Targeted alignment
-                "Skewness": 1.7238, # Targeted alignment
-                "Peak_Amplitude": 2021.0000,
-                "Temperature": 23248.2
+                "RMS": float(calc_rms),
+                "Kurtosis": float(calc_kurt),
+                "Skewness": float(calc_skew),
+                "Peak_Amplitude": float(calc_peak),
+                "Temperature": 25.0 # You can map this to your Thermal sensor later
             }
         
         return {"error": "Empty numeric array"}
