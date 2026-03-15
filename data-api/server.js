@@ -46,16 +46,24 @@ app.post('/api/upload-data', upload.single('file'), async (req, res) => {
     } else {
       try {
         const result = JSON.parse(output);
-        row.push(result.RMS, result.Kurtosis, result.Skewness, result.Peak_Amplitude, result.Temperature);
+        // Added result.Status to the end of the array
+        row.push(
+          result.RMS, 
+          result.Kurtosis, 
+          result.Skewness, 
+          result.Peak_Amplitude, 
+          result.Temperature,
+          result.Status
+        );
       } catch (e) {
         row.push("JSON_PARSE_ERROR");
       }
     }
 
-    // Append to Google Sheets
+    // Append to Google Sheets - Range updated to A:G to include the Status column
     await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.SHEET_ID,
-      range: `'${TARGET_SHEET}'!A:F`,
+      range: `'${TARGET_SHEET}'!A:G`,
       valueInputOption: 'USER_ENTERED',
       resource: { values: [row] },
     });
