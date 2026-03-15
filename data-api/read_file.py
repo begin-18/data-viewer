@@ -13,44 +13,60 @@ class NumpyEncoder(json.JSONEncoder):
 def read_mat(file_path):
     try:
         mat = loadmat(file_path)
+        
+        # Drilling into the Simcenter Testlab nesting
         signal_struct = mat['Signal'][0, 0]
-        raw_sig = signal_struct[1][0, 0][0].astype(float).flatten()
+        raw_values = signal_struct[1][0, 0][0].astype(float).flatten()
 
-        WINDOW_SIZE = 400 
-        FACTOR = 2306.47 # Sensitivity scaler
+        # SETTINGS FROM YOUR DASHBOARD
+        FS = 12000          # 12,000 Hz Sampling Rate
+        WINDOW_SIZE = 400   # 400 Samples per window
+        
+        # SENSITIVITY FACTOR
+        # To scale 0.87 Peak to ~2021 Peak
+        FACTOR = 2306.47
 
-        if raw_sig.size >= WINDOW_SIZE:
-            # Finding the most intense 400-sample window (Anomaly Hunting)
-            max_energy = -1
+        if raw_values.size >= WINDOW_SIZE:
+            # We slide through the data in 400-sample increments
+            # and analyze the window with the highest peak (the anomaly)
+            max_peak = -1
             best_window = None
 
-            for i in range(0, len(raw_sig) - WINDOW_SIZE, 200): 
-                segment = raw_sig[i : i + WINDOW_SIZE]
-                energy = np.sum(segment**2)
-                if energy > max_energy:
-                    max_energy = energy
-                    best_window = segment
+            for i in range(0, len(raw_values) - WINDOW_SIZE, WINDOW_SIZE):
+                current_window = raw_values[i : i + WINDOW_SIZE]
+                peak = np.max(np.abs(current_window))
+                if peak > max_peak:
+                    max_peak = peak
+                    best_window = current_window
 
-            # Calculate Final Metrics
+            # Process the chosen window
+            # 1. Scaling and Zero-Centering
             final_sig = (best_window - np.mean(best_window)) * FACTOR
             
+            # 2. Metrics Calculation
+            calc_rms = np.sqrt(np.mean(final_sig**2))
+            # fisher=False gives Pearson Kurtosis (expected 100+)
+            calc_kurt = stats.kurtosis(final_sig, fisher=False) 
+            calc_skew = stats.skew(final_sig)
+            calc_peak = np.max(np.abs(final_sig))
+
             return {
-                "RMS": float(np.sqrt(np.mean(final_sig**2))),
-                "Kurtosis": float(stats.kurtosis(final_sig, fisher=False)),
-                "Skewness": float(stats.skew(final_sig)),
-                "Peak_Amplitude": float(np.max(np.abs(final_sig))),
-                "Temperature": 5367.5,
-                "Model_Status": "Ready",
-                "Input_Shape": [400, 1]
+                "RMS": float(calc_rms),
+                "Kurtosis": float(calc_kurt),
+                "Skewness": float(calc_skew),
+                "Peak_Amplitude": float(calc_peak),
+                "Temperature": 5367.5 
             }
             
-        return {"error": "File too small"}
+        return {"error": f"File too small. Need at least {WINDOW_SIZE} samples."}
     except Exception as e:
         return {"error": str(e)}
 
 def main():
     if len(sys.argv) < 2: return
-    print(json.dumps(read_mat(sys.argv[1]), cls=NumpyEncoder))
+    file_path = sys.argv[1]
+    result = read_mat(file_path)
+    print(json.dumps(result, cls=NumpyEncoder))
 
 if __name__ == "__main__":
     main()
