@@ -39,8 +39,10 @@ const Dashboard = ({ latestData, chartLogs, allRows, currentTheme, onSelectData,
     );
   }
 
-  const status = latestData.Status; 
-  const isHealthy = status === 0;
+  // LOGIC: Check the specific "Status (0/1)" column from your sheet
+  const statusValue = latestData["Status (0/1)"]; 
+  const isHealthy = String(statusValue) === "0" || statusValue === 0;
+
   const cardBg = 'rgba(30, 41, 59, 0.7)'; 
   const textMuted = '#94a3b8';
   const successColor = '#4ade80';
@@ -49,7 +51,7 @@ const Dashboard = ({ latestData, chartLogs, allRows, currentTheme, onSelectData,
   return (
     <div style={{ padding: "30px", backgroundColor: '#0f172a', minHeight: '100vh', color: '#f8fafc' }}>
       
-      {/* 1. FAULT DETECTION BANNER */}
+      {/* 1. FAULT DETECTION BANNER - Appears when status is 1 */}
       {!isHealthy && (
         <div style={{
           border: `1px solid ${anomalyColor}`,
@@ -72,8 +74,8 @@ const Dashboard = ({ latestData, chartLogs, allRows, currentTheme, onSelectData,
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#fff', lineHeight: 1 }}>78%</div>
-            <div style={{ fontSize: '0.7rem', color: textMuted, textTransform: 'uppercase' }}>Anomaly Score</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#fff', lineHeight: 1 }}>FAULTY</div>
+            <div style={{ fontSize: '0.7rem', color: textMuted, textTransform: 'uppercase' }}>System State</div>
           </div>
         </div>
       )}
@@ -94,7 +96,7 @@ const Dashboard = ({ latestData, chartLogs, allRows, currentTheme, onSelectData,
           <div>
             <span style={{ color: textMuted, fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: 600 }}>System Status</span>
             <h4 style={{ color: isHealthy ? successColor : anomalyColor, margin: 0, fontSize: '1.1rem' }}>
-              Equipment Operating: {isHealthy ? "Normal" : "At Risk"}
+              Equipment Operating: {isHealthy ? "Healthy" : "Faulty"}
             </h4>
           </div>
         </div>
@@ -107,22 +109,21 @@ const Dashboard = ({ latestData, chartLogs, allRows, currentTheme, onSelectData,
       {/* 3. ANALYTICS GRID */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '40px' }}>
         
-        <MetricCard title="Vibration" icon={<Activity size={20} color="#c084fc"/>} status={isHealthy ? "Healthy" : "Check"} statusColor={isHealthy ? successColor : "#fbbf24"} bgColor={cardBg} chartData={chartLogs?.Vibration || []} lineColor="#c084fc">
+        <MetricCard title="Vibration" icon={<Activity size={20} color="#c084fc"/>} status={isHealthy ? "Healthy" : "Faulty"} statusColor={isHealthy ? successColor : anomalyColor} bgColor={cardBg} chartData={chartLogs?.Vibration || []} lineColor="#c084fc">
           <MetricRow label="RMS" value={latestData.RMS?.toFixed(4)}/>
           <MetricRow label="Kurtosis" value={latestData.Kurtosis?.toFixed(4)}/>
           <MetricRow label="Peak Amp" value={latestData.PeakAmp?.toFixed(4)}/>
         </MetricCard>
 
-        <MetricCard title="Acoustic" icon={<Mic size={20} color="#38bdf8"/>} status={isHealthy ? "Healthy" : "Check"} statusColor={isHealthy ? successColor : "#fbbf24"} bgColor={cardBg} chartData={chartLogs?.Acoustic || []} lineColor="#38bdf8">
+        <MetricCard title="Acoustic" icon={<Mic size={20} color="#38bdf8"/>} status={isHealthy ? "Healthy" : "Faulty"} statusColor={isHealthy ? successColor : anomalyColor} bgColor={cardBg} chartData={chartLogs?.Acoustic || []} lineColor="#38bdf8">
           <MetricRow label="RMS" value={latestData.RMS?.toFixed(4)}/>
           <MetricRow label="Kurtosis" value={latestData.Kurtosis?.toFixed(4)}/>
           <MetricRow label="Peak Amp" value={latestData.PeakAmp?.toFixed(4)}/>
         </MetricCard>
 
-        <MetricCard title="Thermal" icon={<Thermometer size={20} color="#fb7185"/>} status={isHealthy ? "Healthy" : "Critical"} statusColor={isHealthy ? successColor : anomalyColor} bgColor={cardBg} chartData={chartLogs?.Thermal || []} lineColor="#fb7185">
+        <MetricCard title="Thermal" icon={<Thermometer size={20} color="#fb7185"/>} status={isHealthy ? "Healthy" : "Faulty"} statusColor={isHealthy ? successColor : anomalyColor} bgColor={cardBg} chartData={chartLogs?.Thermal || []} lineColor="#fb7185">
           <MetricRow label="Avg Temp" value={latestData.Temperature?.toFixed(4)}/>
           <MetricRow label="Max Observed" value={(latestData.Temperature + 0.521).toFixed(4)}/>
-          {/* FIXED: Using local color string here instead of undefined variable */}
           <div style={{ marginTop: 15, height: 4, background: '#334155', borderRadius: 2 }}>
              <div style={{ width: `${Math.min(latestData.Temperature, 100)}%`, height: '100%', background: '#fb7185', borderRadius: 2 }}></div>
           </div>
@@ -168,74 +169,80 @@ const Dashboard = ({ latestData, chartLogs, allRows, currentTheme, onSelectData,
               No data logs available in the current session.
             </div>
           ) : (
-            allRows.map((row, index) => (
-              <div 
-                key={index}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  background: latestData.Timestamp === row.timestamp ? 'rgba(56, 189, 248, 0.08)' : 'rgba(15, 23, 42, 0.3)',
-                  border: `1px solid ${latestData.Timestamp === row.timestamp ? '#38bdf8' : '#334155'}`,
-                  borderRadius: '12px',
-                  paddingRight: '12px'
-                }}
-              >
-                <button
-                  onClick={() => onSelectData(row)}
+            allRows.map((row, index) => {
+              // Row level check for history items using the column label
+              const rowStatus = row["Status (0/1)"];
+              const isRowHealthy = String(rowStatus) === "0" || rowStatus === 0;
+              
+              return (
+                <div 
+                  key={index}
                   style={{
-                    flex: 1,
                     display: 'flex',
-                    justifyContent: 'space-between',
                     alignItems: 'center',
-                    padding: '16px 20px',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#fff',
-                    textAlign: 'left'
+                    background: latestData.Timestamp === row.timestamp ? 'rgba(56, 189, 248, 0.08)' : 'rgba(15, 23, 42, 0.3)',
+                    border: `1px solid ${latestData.Timestamp === row.timestamp ? '#38bdf8' : '#334155'}`,
+                    borderRadius: '12px',
+                    paddingRight: '12px'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <div style={{ padding: 8, background: '#1e293b', borderRadius: 8 }}>
-                       <Clock size={16} color={latestData.Timestamp === row.timestamp ? "#38bdf8" : textMuted} />
+                  <button
+                    onClick={() => onSelectData(row)}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '16px 20px',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#fff',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                      <div style={{ padding: 8, background: '#1e293b', borderRadius: 8 }}>
+                         <Clock size={16} color={latestData.Timestamp === row.timestamp ? "#38bdf8" : textMuted} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>Log_{row.timestamp.replace(/[/ :]/g, '_')}</div>
+                        <div style={{ fontSize: '0.75rem', color: textMuted }}>{row.timestamp}</div>
+                      </div>
                     </div>
-                    <div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>Log_{row.timestamp.replace(/[/ :]/g, '_')}</div>
-                      <div style={{ fontSize: '0.75rem', color: textMuted }}>{row.timestamp}</div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+                      <div style={{ 
+                        fontSize: '0.75rem', 
+                        padding: '4px 10px', 
+                        borderRadius: '6px', 
+                        background: isRowHealthy ? 'rgba(74, 222, 128, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                        color: isRowHealthy ? successColor : anomalyColor,
+                        border: `1px solid ${isRowHealthy ? 'rgba(74, 222, 128, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
+                      }}>
+                        {isRowHealthy ? 'Healthy' : 'Faulty'}
+                      </div>
+                      <ChevronRight size={18} color={textMuted} />
                     </div>
-                  </div>
-                  
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-                    <div style={{ 
-                      fontSize: '0.75rem', 
-                      padding: '4px 10px', 
-                      borderRadius: '6px', 
-                      background: row.fault_type?.toLowerCase().includes('normal') ? 'rgba(74, 222, 128, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                      color: row.fault_type?.toLowerCase().includes('normal') ? successColor : anomalyColor,
-                      border: `1px solid ${row.fault_type?.toLowerCase().includes('normal') ? 'rgba(74, 222, 128, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
-                    }}>
-                      {row.fault_type || 'Unclassified'}
-                    </div>
-                    <ChevronRight size={18} color={textMuted} />
-                  </div>
-                </button>
+                  </button>
 
-                <div style={{ width: 1, height: 30, background: '#334155', margin: '0 8px' }}></div>
+                  <div style={{ width: 1, height: 30, background: '#334155', margin: '0 8px' }}></div>
 
-                <button 
-                  onClick={() => onDeleteFile(row.timestamp)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#64748b',
-                    cursor: 'pointer',
-                    padding: '10px'
-                  }}
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            ))
+                  <button 
+                    onClick={() => onDeleteFile(row.timestamp)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#64748b',
+                      cursor: 'pointer',
+                      padding: '10px'
+                    }}
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              )
+            })
           )}
         </div>
       </div>
