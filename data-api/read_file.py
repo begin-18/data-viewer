@@ -8,42 +8,38 @@ class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
-        if isinstance(obj, (np.int64, np.int32, np.int16)):
-            return int(obj)
-        if isinstance(obj, (np.float64, np.float32)):
-            return float(obj)
-        return super(NumpyEncoder, self).default(obj)
-
-def calculate_metrics(data_array):
-    # Ensure it's a flat numpy array for calculation
-    sig = np.array(data_array).flatten()
-    if sig.size == 0:
-        return {"RMS": 0, "Kurtosis": 0, "Skewness": 0, "Peak": 0}
-    
-    return {
-        "RMS": float(np.sqrt(np.mean(sig**2))),
-        "Kurtosis": float(stats.kurtosis(sig)),
-        "Skewness": float(stats.skew(sig)),
-        "Peak_Amplitude": float(np.max(np.abs(sig)))
-    }
+        return float(obj) if isinstance(obj, (np.float64, np.float32)) else obj
 
 def read_mat(file_path):
     try:
         from scipy.io import loadmat
         mat_data = loadmat(file_path)
         
-        # We now know your data is stored under the key 'Signal'
-        if 'Signal' in mat_data:
-            raw_signal = mat_data['Signal']
-            metrics = calculate_metrics(raw_signal)
-            
-            # If the Signal array also contains temperature (e.g. at the end), 
-            # we'd extract it here. For now, we'll set a placeholder or 
-            # use a value from the signal if it looks like a temp reading.
-            metrics["Temperature"] = 25.0 # Default if temp isn't a separate key
-            return metrics
+        # Target the 'Signal' variable
+        if 'Signal' not in mat_data:
+            return {"RMS": "Error: 'Signal' not found", "Kurtosis": 0, "Skewness": 0, "Peak_Amplitude": 0, "Temperature": 0}
+
+        raw_data = mat_data['Signal']
+        
+        # If Signal is 2D (rows and columns), we need to pick the right data
+        if len(raw_data.shape) > 1 and raw_data.shape[1] > 1:
+            # Let's try to use the first column (index 0)
+            # Many datasets put Vibration in Col 0 and Acoustic in Col 1
+            sig = raw_data[:, 0].flatten()
         else:
-            return {"error": "Variable 'Signal' not found in .mat file"}
+            sig = raw_data.flatten()
+
+        # Check if the signal is actually populated
+        if np.all(sig == 0):
+            return {"RMS": "Error: Signal is all zeros", "Kurtosis": 0, "Skewness": 0, "Peak_Amplitude": 0, "Temperature": 0}
+
+        return {
+            "RMS": float(np.sqrt(np.mean(sig**2))),
+            "Kurtosis": float(stats.kurtosis(sig)),
+            "Skewness": float(stats.skew(sig)),
+            "Peak_Amplitude": float(np.max(np.abs(sig))),
+            "Temperature": float(np.mean(raw_data[:, -1])) if raw_data.ndim > 1 else 25.0
+        }
             
     except Exception as e:
         return {"error": str(e)}
