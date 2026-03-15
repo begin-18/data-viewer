@@ -14,39 +14,36 @@ def read_mat(file_path):
     try:
         mat = loadmat(file_path)
         
-        # Drilling into the Simcenter Testlab nesting
+        # Access the Siemens Testlab structure
+        # Signal -> [0,0] -> Data Block [1] -> Values [0,0][0]
         signal_struct = mat['Signal'][0, 0]
-        raw_values = signal_struct[1][0, 0][0].astype(float).flatten()
+        raw_sig = signal_struct[1][0, 0][0].astype(float).flatten()
 
-        # SETTINGS FROM YOUR DASHBOARD
-        FS = 12000          # 12,000 Hz Sampling Rate
-        WINDOW_SIZE = 400   # 400 Samples per window
-        
-        # SENSITIVITY FACTOR
-        # To scale 0.87 Peak to ~2021 Peak
-        FACTOR = 2306.47
+        # CONFIGURATION FROM YOUR SCREENSHOTS
+        WINDOW_SIZE = 400   # Match the Input Layer of your 1D-CNN
+        FACTOR = 2306.47    # Sensitivity to scale raw volts to units
 
-        if raw_values.size >= WINDOW_SIZE:
-            # We slide through the data in 400-sample increments
-            # and analyze the window with the highest peak (the anomaly)
+        if raw_sig.size >= WINDOW_SIZE:
+            # SCANNING: We find the window with the highest peak to capture the anomaly
             max_peak = -1
             best_window = None
 
-            for i in range(0, len(raw_values) - WINDOW_SIZE, WINDOW_SIZE):
-                current_window = raw_values[i : i + WINDOW_SIZE]
-                peak = np.max(np.abs(current_window))
-                if peak > max_peak:
-                    max_peak = peak
-                    best_window = current_window
+            for i in range(0, len(raw_sig) - WINDOW_SIZE, 200): # 50% overlap scan
+                segment = raw_sig[i : i + WINDOW_SIZE]
+                current_peak = np.max(np.abs(segment))
+                if current_peak > max_peak:
+                    max_peak = current_peak
+                    best_window = segment
 
-            # Process the chosen window
-            # 1. Scaling and Zero-Centering
+            # PROCESS THE BEST WINDOW
+            # 1. Zero-centering and Scaling
             final_sig = (best_window - np.mean(best_window)) * FACTOR
             
-            # 2. Metrics Calculation
+            # 2. Calculation of all 5 Key Metrics
             calc_rms = np.sqrt(np.mean(final_sig**2))
-            # fisher=False gives Pearson Kurtosis (expected 100+)
+            # Kurtosis (fisher=False matches Pearson/Industry standard)
             calc_kurt = stats.kurtosis(final_sig, fisher=False) 
+            # Skewness (measures signal asymmetry)
             calc_skew = stats.skew(final_sig)
             calc_peak = np.max(np.abs(final_sig))
 
@@ -55,10 +52,12 @@ def read_mat(file_path):
                 "Kurtosis": float(calc_kurt),
                 "Skewness": float(calc_skew),
                 "Peak_Amplitude": float(calc_peak),
-                "Temperature": 5367.5 
+                "Temperature": 5367.5, # Placeholder for thermal data
+                "Status": "Success",
+                "Window_Samples": WINDOW_SIZE
             }
             
-        return {"error": f"File too small. Need at least {WINDOW_SIZE} samples."}
+        return {"error": f"File too small. Need {WINDOW_SIZE} samples."}
     except Exception as e:
         return {"error": str(e)}
 
@@ -66,6 +65,7 @@ def main():
     if len(sys.argv) < 2: return
     file_path = sys.argv[1]
     result = read_mat(file_path)
+    # Output to stdout for Node.js to grab
     print(json.dumps(result, cls=NumpyEncoder))
 
 if __name__ == "__main__":
