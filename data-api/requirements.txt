@@ -1,2 +1,2 @@
-scipy
-nptdms
+numpy==1.26.4
+scipy==1.12.0
