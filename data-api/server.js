@@ -3,9 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const { google } = require('googleapis');
-const { Readable } = require('stream');
-const csv = require('csv-parser');
-const XLSX = require('xlsx');
 const { spawnSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -33,19 +30,11 @@ const auth = new google.auth.JWT({
 });
 const sheets = google.sheets({ version: 'v4', auth });
 
-const SHEET_MAPPING = {
-  'THERMAL': process.env.THERMAL_SHEET_NAME,
-  'ACOUSTIC': process.env.ACOUSTIC_SHEET_NAME,
-  'VIBRATION': process.env.VIBRATION_SHEET_NAME,
-};
+// --- SINGLE STORAGE CONFIG ---
+const TARGET_SHEET = "New Data Storage";
 
-// --- Main API ---
 app.post('/api/upload-data', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-  
-  const { dataType } = req.body;
-  const sheetName = SHEET_MAPPING[dataType];
-  if (!sheetName) return res.status(400).json({ message: 'Invalid data type' });
 
   const ext = path.extname(req.file.originalname).toLowerCase();
   const tempPath = path.join(__dirname, `temp_${Date.now()}${ext}`);
@@ -53,94 +42,60 @@ app.post('/api/upload-data', upload.single('file'), async (req, res) => {
   try {
     let values = [];
 
-    // 1. Handling CSV/Excel/Text
-    if (ext === '.csv' || ext === '.txt') {
-      const rows = [];
-      await new Promise((resolve, reject) => {
-        Readable.from(req.file.buffer.toString()).pipe(csv())
-          .on('headers', h => rows.push(h))
-          .on('data', d => rows.push(Object.values(d)))
-          .on('end', resolve)
-          .on('error', reject);
-      });
-      values = rows;
-    } 
-    else if (ext === '.xlsx') {
-      const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
-      values = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
-    }
-    // 2. Handling Engineering Files (.mat / .tdms)
-    else if (ext === '.mat' || ext === '.tdms') {
-      // Create physical temp file for Python to read
+    if (ext === '.mat' || ext === '.tdms') {
       fs.writeFileSync(tempPath, req.file.buffer);
 
-      // --- DUAL ENVIRONMENT LOGIC ---
+      // Pathing for Windows vs Linux (Render)
       const isWin = process.platform === "win32";
       const pythonBin = isWin 
         ? path.join(__dirname, 'venv', 'Scripts', 'python.exe') 
         : "python3"; 
 
-      // Run the Python script
       const py = spawnSync(pythonBin, [path.join(__dirname, 'read_file.py'), tempPath]);
-      
-      // Cleanup temp file immediately after Python finishes
       if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
 
-      // --- SAFE STRING HANDLING ---
       const output = py.stdout?.toString().trim() || "";
       const errorOutput = py.stderr?.toString().trim() || "";
 
       if (!output) {
-        console.error("Python Error Details:", errorOutput);
-        return res.status(500).json({ 
-          message: "Python script failed to process file.", 
-          details: errorOutput || "No output returned from Python." 
-        });
+        console.error("PYTHON ERROR:", errorOutput);
+        return res.status(500).json({ message: "Extraction failed", details: errorOutput });
       }
 
       const pyResult = JSON.parse(output);
-      if (pyResult.error) throw new Error(pyResult.error);
-
-      // Transform JSON to 2D Array for Google Sheets
-      const headers = Object.keys(pyResult);
-      const columns = Object.values(pyResult);
-      const rowCount = Math.max(...columns.map(c => Array.isArray(c) ? c.length : 1));
-
-      values.push(headers);
-      for (let i = 0; i < rowCount; i++) {
-        values.push(headers.map((_, colIdx) => {
-          const colData = columns[colIdx];
-          return Array.isArray(colData) ? (colData[i] ?? '') : (i === 0 ? colData : '');
-        }));
-      }
-    }
-    // 3. Audio Metadata
-    else if (['.wav', '.mp3'].includes(ext)) {
-      values = [
-        ['Timestamp', 'Filename', 'Size'],
-        [new Date().toISOString(), req.file.originalname, `${req.file.size} bytes`]
+      const timestamp = new Date().toLocaleString('en-GB'); 
+      
+      // The Professional Mapping (Matches Sheet Columns A-F)
+      const row = [
+        timestamp,                  
+        pyResult.RMS || 0,          
+        pyResult.Kurtosis || 0,     
+        pyResult.Skewness || 0,     
+        pyResult.Peak_Amplitude || 0, 
+        pyResult.Temperature || 0   
       ];
+
+      values = [row];
+    } else {
+        return res.status(400).json({ message: "Please upload a .mat or .tdms file." });
     }
 
-    // --- Final Upload to Google Sheets ---
     if (values.length > 0) {
       await sheets.spreadsheets.values.append({
         spreadsheetId: process.env.SHEET_ID,
-        range: `${sheetName}!A:A`,
+        range: `'${TARGET_SHEET}'!A:F`, 
         valueInputOption: 'USER_ENTERED',
         insertDataOption: 'INSERT_ROWS',
-        resource: { values: values.slice(1) }, // Appends data without repeating headers
+        resource: { values: values },
       });
-      res.status(200).json({ message: 'Upload Successful' });
-    } else {
-      res.status(400).json({ message: 'No data extracted from file.' });
+      res.status(200).json({ message: 'Upload Successful', data: values[0] });
     }
 
   } catch (err) {
     if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-    console.error("[SERVER ERROR]:", err.message);
-    res.status(500).json({ message: "Internal Server Error", details: err.message });
+    console.error("UPLOAD ERROR:", err.message);
+    res.status(500).json({ message: "Server Error", details: err.message });
   }
 });
 
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

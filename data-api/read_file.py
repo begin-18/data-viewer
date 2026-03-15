@@ -1,63 +1,68 @@
-# read_file.py
 import sys
 import json
 import os
+import numpy as np
+from scipy import stats
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, (np.int64, np.int32, np.int16)):
+            return int(obj)
+        if isinstance(obj, (np.float64, np.float32)):
+            return float(obj)
+        return super(NumpyEncoder, self).default(obj)
+
+def get_metric(data, key, signal):
+    if key in data:
+        val = data[key]
+        try:
+            return float(val.flatten()[0]) if isinstance(val, np.ndarray) else float(val)
+        except:
+            pass
+    
+    if signal is not None and len(signal) > 0:
+        try:
+            if key == "RMS": return float(np.sqrt(np.mean(signal**2)))
+            if key == "Kurtosis": return float(stats.kurtosis(signal))
+            if key == "Skewness": return float(stats.skew(signal))
+            if key == "Peak_Amplitude": return float(np.max(np.abs(signal)))
+        except:
+            return 0.0
+    return 0.0
 
 def read_mat(file_path):
     try:
         from scipy.io import loadmat
         mat_data = loadmat(file_path)
-        # Convert numpy arrays to lists; ignore MATLAB internal metadata
-        data_clean = {
-            k: v.tolist() if hasattr(v, "tolist") else v 
-            for k, v in mat_data.items() if not k.startswith('__')
-        }
-        return data_clean
-    except ImportError:
-        return {"error": "Library 'scipy' not found in venv. Run: pip install scipy"}
-    except Exception as e:
-        return {"error": f"Failed to parse .mat file: {str(e)}"}
+        clean = {k: v for k, v in mat_data.items() if not k.startswith('__')}
+        
+        main_signal = None
+        for v in clean.values():
+            if isinstance(v, np.ndarray) and v.size > 10:
+                main_signal = v.flatten()
+                break
 
-def read_tdms(file_path):
-    try:
-        from nptdms import TdmsFile
-        tdms_data = {}
-        tdms_file = TdmsFile.read(file_path)
-        for group in tdms_file.groups():
-            for channel in group.channels():
-                key = f"{group.name}_{channel.name}"
-                tdms_data[key] = channel[:].tolist()
-        return tdms_data
-    except ImportError:
-        return {"error": "Library 'nptdms' not found in venv. Run: pip install nptdms"}
+        return {
+            "RMS": get_metric(clean, "RMS", main_signal),
+            "Kurtosis": get_metric(clean, "Kurtosis", main_signal),
+            "Skewness": get_metric(clean, "Skewness", main_signal),
+            "Peak_Amplitude": get_metric(clean, "Peak_Amplitude", main_signal),
+            "Temperature": get_metric(clean, "Temperature", main_signal)
+        }
     except Exception as e:
-        return {"error": f"Failed to parse .tdms file: {str(e)}"}
+        return {"error": str(e)}
 
 def main():
-    # Ensure we always output valid JSON to stdout
-    try:
-        if len(sys.argv) < 2:
-            print(json.dumps({"error": "No file path provided to Python script"}))
-            return
+    if len(sys.argv) < 2:
+        print(json.dumps({"error": "No file path"}))
+        return
 
-        file_path = sys.argv[1]
-        if not os.path.exists(file_path):
-            print(json.dumps({"error": f"Temp file not found at {file_path}"}))
-            return
-
-        ext = os.path.splitext(file_path)[1].lower()
-
-        if ext == ".mat":
-            result = read_mat(file_path)
-        elif ext == ".tdms":
-            result = read_tdms(file_path)
-        else:
-            result = {"error": f"Unsupported file extension: {ext}"}
-        
-        print(json.dumps(result))
-
-    except Exception as e:
-        print(json.dumps({"error": f"Python Main Error: {str(e)}"}))
+    file_path = sys.argv[1]
+    ext = os.path.splitext(file_path)[1].lower()
+    result = read_mat(file_path) if ext == ".mat" else {"error": "Unsupported file"}
+    print(json.dumps(result, cls=NumpyEncoder))
 
 if __name__ == "__main__":
     main()
