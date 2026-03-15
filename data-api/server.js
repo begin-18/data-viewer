@@ -10,7 +10,13 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+// FIXED: Explicit CORS configuration to allow your GitHub Pages frontend
+app.use(cors({
+  origin: "https://begin-18.github.io",
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type"]
+}));
+
 app.use(express.json());
 const upload = multer({ storage: multer.memoryStorage() });
 
