@@ -87,11 +87,11 @@ const DropZone = ({ dataType, allowedExtensions, currentTheme }) => {
             }}
         >
             <h3 style={{ margin: '0 0 8px 0', color: textColor, fontSize: '16px', fontWeight: '800' }}>
-                {dataType} DATA
+                {dataType}
             </h3>
             
             <p style={{ color: textColor, opacity: 0.7, fontSize: '13px', marginBottom: '15px' }}>
-                Drag & drop or browse
+                
             </p>
 
             <input 

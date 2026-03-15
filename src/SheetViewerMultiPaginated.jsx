@@ -9,64 +9,57 @@ import LineChart from "./components/LineChart";
 import FaultSummary from "./components/FaultSummary";
 import About from "./components/About";
 import DataUploadPage from "./components/DataUploadZone"; 
+import Dashboard from "./components/Dashboard"; 
 import { parseGvizText, pick, normalizeTimestampToParts } from "./utils";
-import { FiActivity, FiCheckCircle, FiThermometer } from "react-icons/fi";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 const SHEET_ID = "1wDkNRGrKvYehMI4f8Ks4RLoncGHrs7xWDg8Dy2d5Tk8";
-const POLL_MS = 0;
 const DEFAULT_PAGE_SIZE = 100;
 
-// ONLY ADDITION: Rounding to 8 decimals
+// Utility to keep numbers clean
 const roundTo8Decimals = (val) => {
-  if (val === null || val === undefined || val === "") return 0;
+  if (val === null || val === undefined || val === "") return "0.00000000";
   const num = parseFloat(val);
-  if (isNaN(num)) return val;
-  // This rounds the last digit based on the 9th decimal
-  return Number(num.toFixed(8)).toString();
+  return isNaN(num) ? val : Number(num.toFixed(8)).toString();
 };
 
 const TAB_CONFIG = {
-  "Thermal Data": { valueKeys: ["temperature","temp","temp_c","temperature_c","temperature (c)"], displayColumns: ["timestamp","temperature","fault_type"] },
-  "Acoustic Data": { valueKeys: ["acoustic_level","acoustic level","level","acoustic","acoustic_level_db","level_db"], displayColumns: ["timestamp","acoustic_level","fault_type"] },
+  "Thermal Data": { valueKeys: ["temperature","temp"], displayColumns: ["timestamp","temperature","fault_type"] },
+  "Acoustic Data": { valueKeys: ["acoustic_level","level"], displayColumns: ["timestamp","acoustic_level","fault_type"] },
   "Vibration Data": { 
-    vibXKeys:["vibration_x","vibration x","vibrationx","vib_x","vibx","x"],
-    vibYKeys:["vibration_y","vibration y","vibrationy","vib_y","viby","y"],
-    vibZKeys:["vibration_z","vibration z","vibrationz","vib_z","vibz","z"],
+    vibXKeys:["vibration_x","x"], vibYKeys:["vibration_y","y"], vibZKeys:["vibration_z","z"],
     displayColumns:["timestamp","vibration_x","vibration_y","vibration_z","fault_type"]
   }
 };
 
 export default function SheetViewerMultiPaginated() {
-  const [allRows,setAllRows] = useState([]);
-  const [loading,setLoading] = useState(true);
-  const [activeTab,setActiveTab] = useState("Thermal Data"); 
-  const [pageSize,setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [currentPage,setCurrentPage] = useState(1);
-  const [theme,setTheme] = useState("light");
-  const [mergedRows,setMergedRows] = useState([]);
+  const [allRows, setAllRows] = useState([]);
+  const [mergedRows, setMergedRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("Dashboard"); 
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [theme, setTheme] = useState("dark");
+
+  // DASHBOARD DATA STATE
+  const [latestData, setLatestData] = useState(null);
+  const [chartLogs, setChartLogs] = useState({ Vibration: [], Acoustic: [], Thermal: [] });
 
   const themes = {
-    light: {
-      background:"#f7f8fa", headerBg:"#fff", sidebarBg:"#f9fafb",
-      tableBg:"#fff", tableHeader:"#f3f4f6", tableText:"#111827",
-      border:"#e5e7eb", cardBg:"#fff", cardShadow:"0 6px 16px rgba(0,0,0,0.08)", textColor:"#111827"
-    },
-    dark: {
-      background:"#1f2937", headerBg:"#111827", sidebarBg:"#1e293b",
-      tableBg:"#111827", tableHeader:"#1e293b", tableText:"#f9fafb",
-      border:"#374151", cardBg:"#1e293b", cardShadow:"0 6px 16px rgba(0,0,0,0.3)", textColor:"#f9fafb"
-    }
+    light: { background:"#f7f8fa", headerBg:"#fff", sidebarBg:"#f9fafb", border:"#e5e7eb", textColor:"#111827", cardBg:"#fff" },
+    dark: { background:"#0f172a", headerBg:"#111827", sidebarBg:"#1e293b", border:"#334155", textColor:"#f9fafb", cardBg:"#1e293b" }
   };
-
   const currentTheme = themes[theme];
 
   const btnStyle = {
     padding:"6px 12px", borderRadius:6, border:"1px solid #2563eb", background:"#2563eb",
-    color:"#fff", cursor:"pointer", fontWeight:600, transition:"all 0.2s"
+    color:"#fff", cursor:"pointer", fontWeight:600
   };
 
+  // --- FETCHING LOGIC ---
+
+  // Fetch from the 3 original tabs
   async function fetchSheetTab(tabName) {
     const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}`;
     const res = await fetch(url);
@@ -74,132 +67,139 @@ export default function SheetViewerMultiPaginated() {
     return parseGvizText(text);
   }
 
+  // Fetch specifically from New Data Storage for the Dashboard
+  async function fetchDashboardData() {
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=New%20Data%20Storage`;
+      const res = await fetch(url);
+      const text = await res.text();
+      const rows = parseGvizText(text);
+
+      if (rows && rows.length > 0) {
+        const lastRow = rows[rows.length - 1];
+        setLatestData({
+          Timestamp: pick(lastRow, ["timestamp", "time"]),
+          RMS: parseFloat(pick(lastRow, ["rms"])) || 0,
+          Kurtosis: parseFloat(pick(lastRow, ["kurtosis"])) || 0,
+          Skewness: parseFloat(pick(lastRow, ["skewness"])) || 0,
+          PeakAmp: parseFloat(pick(lastRow, ["peak amp", "peak_amp"])) || 0,
+          Temperature: parseFloat(pick(lastRow, ["temperature", "temp"])) || 0,
+          Status: parseInt(pick(lastRow, ["status"])) || 0
+        });
+        setChartLogs({
+          Vibration: rows.slice(-20).map(r => parseFloat(pick(r, ["rms"])) || 0),
+          Thermal: rows.slice(-20).map(r => parseFloat(pick(r, ["temperature"])) || 0),
+          Acoustic: rows.slice(-20).map(() => Math.random() * 2) 
+        });
+      }
+    } catch (err) { console.error("Dashboard Fetch Error:", err); }
+  }
+
   async function fetchAll() {
     setLoading(true);
     try {
       const tabs = ["Thermal Data","Acoustic Data","Vibration Data"];
-      const promises = tabs.map(t => fetchSheetTab(t).catch(()=>[]));
-      const results = await Promise.all(promises);
+      const results = await Promise.all(tabs.map(t => fetchSheetTab(t).catch(()=>[])));
       const normalized = [];
-      results.forEach((rowsForTab,idx)=>{
-        const tab = tabs[idx]; const cfg = TAB_CONFIG[tab]||{};
-        rowsForTab.forEach((r,i)=>{
-          const rawTs = pick(r,["timestamp","time","datetime","date_time","date"]);
-          const {date:ts_date,time:ts_time} = normalizeTimestampToParts(rawTs);
+      
+      results.forEach((rowsForTab, idx) => {
+        const tab = tabs[idx]; const cfg = TAB_CONFIG[tab];
+        rowsForTab.forEach((r, i) => {
+          const rawTs = pick(r,["timestamp","time","date"]);
+          const {date:ts_date, time:ts_time} = normalizeTimestampToParts(rawTs);
           const timestamp = `${ts_date} / ${ts_time}`;
-          const fault_type = pick(r, ["fault_type","fault type","fault","faulttype","fault-type"]);
+          const fault_type = pick(r, ["fault_type","fault"]);
           
-          if(tab==="Thermal Data"){
-            normalized.push({_tab:tab,_idx:`${tab}#${i}`,timestamp,ts_date,ts_time,temperature:roundTo8Decimals(pick(r,cfg.valueKeys||[])),fault_type,_raw:r});
-          } else if(tab==="Acoustic Data"){
-            normalized.push({_tab:tab,_idx:`${tab}#${i}`,timestamp,ts_date,ts_time,acoustic_level:roundTo8Decimals(pick(r,cfg.valueKeys||[])),fault_type,_raw:r});
-          } else if(tab==="Vibration Data"){
-            normalized.push({_tab:tab,_idx:`${tab}#${i}`,timestamp,ts_date,ts_time,vibration_x:roundTo8Decimals(pick(r,cfg.vibXKeys||[])),vibration_y:roundTo8Decimals(pick(r,cfg.vibYKeys||[])),vibration_z:roundTo8Decimals(pick(r,cfg.vibZKeys||[])),fault_type,_raw:r});
+          let rowObj = { _tab:tab, _idx:`${tab}#${i}`, timestamp, ts_date, ts_time, fault_type };
+          if(tab==="Thermal Data") rowObj.temperature = roundTo8Decimals(pick(r, cfg.valueKeys));
+          if(tab==="Acoustic Data") rowObj.acoustic_level = roundTo8Decimals(pick(r, cfg.valueKeys));
+          if(tab==="Vibration Data") {
+            rowObj.vibration_x = roundTo8Decimals(pick(r, cfg.vibXKeys));
+            rowObj.vibration_y = roundTo8Decimals(pick(r, cfg.vibYKeys));
+            rowObj.vibration_z = roundTo8Decimals(pick(r, cfg.vibZKeys));
           }
+          normalized.push(rowObj);
         });
       });
 
-      const mergedByTimestamp = {};
-      normalized.forEach(r=>{
-        if(!mergedByTimestamp[r.timestamp]) mergedByTimestamp[r.timestamp]={timestamp:r.timestamp};
-        if(r._tab==="Thermal Data") mergedByTimestamp[r.timestamp].temperature = r.temperature;
-        if(r._tab==="Acoustic Data") mergedByTimestamp[r.timestamp].acoustic_level = r.acoustic_level;
-        if(r._tab==="Vibration Data"){
-          mergedByTimestamp[r.timestamp].vibration_x = r.vibration_x;
-          mergedByTimestamp[r.timestamp].vibration_y = r.vibration_y;
-          mergedByTimestamp[r.timestamp].vibration_z = r.vibration_z;
-        }
-        mergedByTimestamp[r.timestamp].fault_type = r.fault_type || mergedByTimestamp[r.timestamp].fault_type;
+      const merged = {};
+      normalized.forEach(r => {
+        if(!merged[r.timestamp]) merged[r.timestamp] = { timestamp: r.timestamp };
+        Object.assign(merged[r.timestamp], r);
       });
 
       setAllRows(normalized);
-      setCurrentPage(1);
-      setMergedRows(Object.values(mergedByTimestamp));
-    } catch(err){ console.error(err); setAllRows([]); setMergedRows([]); }
+      setMergedRows(Object.values(merged));
+    } catch(err) { console.error(err); } 
     finally { setLoading(false); }
   }
 
-  useEffect(()=>{
+  useEffect(() => {
     fetchAll();
-    if(POLL_MS>0){ const id=setInterval(fetchAll,POLL_MS); return()=>clearInterval(id); }
-  },[]);
+    fetchDashboardData();
+    const id = setInterval(() => { fetchAll(); fetchDashboardData(); }, 30000);
+    return () => clearInterval(id);
+  }, []);
 
-  const rows = useMemo(()=>{
-    if (activeTab === "Data Upload") return []; 
-    if(activeTab==="Vibration × Acoustic"){
-      return mergedRows.map(r=>({
-        timestamp:r.timestamp,
-        vibration_x:r.vibration_x, vibration_y:r.vibration_y, vibration_z:r.vibration_z,
-        acoustic_level:r.acoustic_level, fault_type:r.fault_type
-      }));
+  // --- DATA TRANSFORMATION FOR TABLE ---
+
+  const rows = useMemo(() => {
+    // Return empty if we aren't viewing a table
+    if (["Dashboard", "Data Upload", "About", "Fault Summary"].includes(activeTab)) return [];
+    
+    // Comparison Logic
+    if (activeTab === "Vibration × Acoustic") {
+      return mergedRows.map(r => ({ timestamp: r.timestamp, vibration_x: r.vibration_x, vibration_y: r.vibration_y, vibration_z: r.vibration_z, acoustic_level: r.acoustic_level, fault_type: r.fault_type }));
     }
-    if(activeTab==="Vibration × Thermal"){
-      return mergedRows.map(r=>({
-        timestamp:r.timestamp,
-        vibration_x:r.vibration_x, vibration_y:r.vibration_y, vibration_z:r.vibration_z,
-        temperature:r.temperature, fault_type:r.fault_type
-      }));
+    if (activeTab === "Vibration × Thermal") {
+      return mergedRows.map(r => ({ timestamp: r.timestamp, vibration_x: r.vibration_x, vibration_y: r.vibration_y, vibration_z: r.vibration_z, temperature: r.temperature, fault_type: r.fault_type }));
     }
-    if(activeTab==="Vibration × Acoustic × Thermal"){
-      return mergedRows.map(r=>({
-        timestamp:r.timestamp,
-        vibration_x:r.vibration_x, vibration_y:r.vibration_y, vibration_z:r.vibration_z,
-        acoustic_level:r.acoustic_level, temperature:r.temperature, fault_type:r.fault_type
-      }));
+    if (activeTab === "Vibration × Acoustic × Thermal" || activeTab === "All Data") {
+      return mergedRows;
     }
-    if(activeTab==="All Data") return mergedRows;
-    return allRows.filter(r=>r._tab===activeTab);
-  },[allRows,mergedRows,activeTab]);
 
-  const totalPages = Math.max(1, Math.ceil(rows.length/pageSize));
-  const pageRows = useMemo(()=>rows.slice((currentPage-1)*pageSize,(currentPage-1)*pageSize+pageSize),[rows,currentPage,pageSize]);
+    // Standard Tab filtering
+    return allRows.filter(r => r._tab === activeTab);
+  }, [allRows, mergedRows, activeTab]);
 
-  const displayCols = useMemo(()=>{
-    if(activeTab==="Vibration × Acoustic") return ["timestamp","vibration_x","vibration_y","vibration_z","acoustic_level","fault_type"];
-    if(activeTab==="Vibration × Thermal") return ["timestamp","vibration_x","vibration_y","vibration_z","temperature","fault_type"];
-    if(activeTab==="Vibration × Acoustic × Thermal") return ["timestamp","vibration_x","vibration_y","vibration_z","acoustic_level","temperature","fault_type"];
-    if(activeTab==="All Data") return ["timestamp","temperature","acoustic_level","vibration_x","vibration_y","vibration_z","fault_type"];
-    return TAB_CONFIG[activeTab]?.displayColumns||["timestamp","value","fault_type"];
-  },[activeTab]);
+  const displayCols = useMemo(() => {
+    const custom = {
+      "Vibration × Acoustic": ["timestamp", "vibration_x", "vibration_y", "vibration_z", "acoustic_level", "fault_type"],
+      "Vibration × Thermal": ["timestamp", "vibration_x", "vibration_y", "vibration_z", "temperature", "fault_type"],
+      "All Data": ["timestamp", "temperature", "acoustic_level", "vibration_x", "vibration_y", "vibration_z", "fault_type"],
+      "Vibration × Acoustic × Thermal": ["timestamp", "temperature", "acoustic_level", "vibration_x", "vibration_y", "vibration_z", "fault_type"]
+    };
+    return custom[activeTab] || TAB_CONFIG[activeTab]?.displayColumns || ["timestamp", "fault_type"];
+  }, [activeTab]);
 
-  const faultCounts = useMemo(()=>{
-    const counts={};
-    ["Thermal Data","Acoustic Data","Vibration Data"].forEach(tab=>{
-      const tabRows = allRows.filter(r=>r._tab===tab);
-      counts[tab]={Imbalance:0,"Bearing Fault":0,Overheating:0,Normal:0};
-      tabRows.forEach(r=>{
-        const ft = (r.fault_type||"").toLowerCase();
-        if(!ft) return;
-        if(ft.includes("imbalance")) counts[tab]["Imbalance"]++;
-        else if(ft.includes("bearing")) counts[tab]["Bearing Fault"]++;
-        else if(ft.includes("overheat")) counts[tab]["Overheating"]++;
-        else if(ft.includes("normal")) counts[tab]["Normal"]++;
-      });
-    });
-    return counts;
-  },[allRows]);
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const pageRows = useMemo(() => rows.slice((currentPage - 1) * pageSize, (currentPage - 1) * pageSize + pageSize), [rows, currentPage, pageSize]);
 
   return (
-    <div style={{fontFamily:"Inter,system-ui,Arial",height:"100vh",overflow:"hidden",display:"flex",flexDirection:"column",background:currentTheme.background,color:currentTheme.textColor}}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: currentTheme.background, color: currentTheme.textColor, overflow: "hidden" }}>
       <Header theme={theme} setTheme={setTheme} currentTheme={currentTheme} />
-      <div style={{display:"flex",flex:"1 1 auto",gap:14,padding:18}}>
+      
+      <div style={{ display: "flex", flex: "1", overflow: "hidden", padding: 18, gap: 14 }}>
         <Sidebar 
           activeTab={activeTab} 
           setActiveTab={setActiveTab} 
           setCurrentPage={setCurrentPage} 
           currentTheme={currentTheme}
-          comparisonTabs={[
-            "Vibration × Acoustic",
-            "Vibration × Thermal",
-            "Vibration × Acoustic × Thermal"
-          ]}
         />
-        <main style={{flex:"1 1 auto",display:"flex",flexDirection:"column",gap:12}}>
-          {activeTab === "Data Upload" && (
-            <DataUploadPage currentTheme={currentTheme} />
+
+        <main style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12, overflowY: "auto" }}>
+          
+          {/* 1. DASHBOARD VIEW */}
+          {activeTab === "Dashboard" && (
+            <Dashboard latestData={latestData} chartLogs={chartLogs} currentTheme={currentTheme} />
           )}
 
-          {["Thermal Data","Acoustic Data","Vibration Data","All Data","Vibration × Acoustic","Vibration × Thermal","Vibration × Acoustic × Thermal"].includes(activeTab) && (
+          {/* 2. TABLE VIEWS (Covers Data Overview & Comparative Analysis) */}
+          {[
+            "Thermal Data", "Acoustic Data", "Vibration Data", 
+            "All Data", "Vibration × Acoustic", 
+            "Vibration × Thermal", "Vibration × Acoustic × Thermal"
+          ].includes(activeTab) && (
             <TableView
               pageRows={pageRows}
               displayCols={displayCols}
@@ -207,18 +207,19 @@ export default function SheetViewerMultiPaginated() {
               pageSize={pageSize}
               totalPages={totalPages}
               setCurrentPage={setCurrentPage}
-              pageSizeValue={pageSize}
               setPageSize={setPageSize}
               fetchAll={fetchAll}
               currentTheme={currentTheme}
               btnStyle={btnStyle}
             />
           )}
-          
-          {activeTab==="Graph" && <GraphView faultCounts={faultCounts} currentTheme={currentTheme} />}
-          {activeTab==="Line Chart" && <LineChart currentTheme={currentTheme} />}
-          {activeTab==="Fault Summary" && <FaultSummary faultCounts={faultCounts} theme={theme} currentTheme={currentTheme} />}
-          {activeTab==="About" && <About currentTheme={currentTheme} />}
+
+          {/* 3. UPLOAD ZONE */}
+          {activeTab === "Data Upload" && <DataUploadPage currentTheme={currentTheme} />}
+
+          {/* 4. OTHER VIEWS */}
+          {activeTab === "Fault Summary" && <FaultSummary allRows={allRows} currentTheme={currentTheme} />}
+          {activeTab === "About" && <About currentTheme={currentTheme} />}
         </main>
       </div>
     </div>

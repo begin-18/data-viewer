@@ -1,218 +1,134 @@
-// src/components/Sidebar.jsx
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { LayoutDashboard, Database, BarChart3, AlertTriangle, Settings, UserCircle, Target, Layers } from "lucide-react";
 
-export default function Sidebar({ activeTab, setActiveTab, setCurrentPage, currentTheme }) {
-  // ADDED "DATA UPLOAD & PROCESSING" to the main tabs array
-  const mainTabs = ["Data Overview", "Comparative Analysis", "Fault Summary", "Line Chart", "Data Upload", "About"];
+export default function Sidebar({ activeTab, setActiveTab, currentTheme, isUserAdmin }) {
+  const mainTabs = ["Dashboard", "Data Logs", "Analyses", "Fault Summary", "Data Upload", "Settings"];
   
-  const subTabsAllData = ["Thermal Data", "Acoustic Data", "Vibration Data"];
+  const subTabsDataLogs = ["Thermal Data", "Acoustic Data", "Vibration Data"];
+  
+  // These must match the strings in your SheetViewer logic exactly
   const subTabsComparisons = [
-    "Vibration × Acoustic",
-    "Vibration × Thermal",
+    "Vibration × Acoustic", 
+    "Vibration × Thermal", 
     "Vibration × Acoustic × Thermal"
   ];
 
-  const UPLOAD_PAGE_TITLE = "Data Upload";
+  const [openSubMenu, setOpenSubMenu] = useState(null); 
 
-  const [activeSubTab, setActiveSubTab] = useState(subTabsAllData[0]);
-  const [allDataOpen, setAllDataOpen] = useState(false);
-  const [comparisonsOpen, setComparisonsOpen] = useState(false);
+  const linkButtonStyle = (tab, isSubItem = false) => ({
+    width: "100%",
+    padding: isSubItem ? "10px 15px 10px 40px" : "12px 15px",
+    textAlign: "left",
+    borderRadius: 8,
+    border: activeTab === tab ? `2px solid #2563eb` : `1px solid transparent`,
+    background: activeTab === tab ? "#2563eb20" : "transparent",
+    cursor: "pointer",
+    fontWeight: activeTab === tab ? 700 : 500,
+    color: activeTab === tab ? "#2563eb" : currentTheme.textColor,
+    transition: "all 0.2s",
+    fontSize: isSubItem ? 13 : 15,
+    display: "flex",
+    alignItems: "center",
+    gap: isSubItem ? 8 : 12,
+    textDecoration: "none",
+    marginBottom: 2
+  });
 
-  const handleSubTabClick = (tab) => {
-    setActiveSubTab(tab);
-    setActiveTab(tab);
-    setCurrentPage(1);
+  const handleSubTabClick = (tabName) => {
+    setActiveTab(tabName);
   };
 
   return (
     <aside style={{
-      width: 210,
-      flex: "0 0 220px",
+      width: 260,
+      flex: "0 0 260px",
       display: "flex",
       flexDirection: "column",
-      justifyContent: "space-between",
-      overflowY: "auto",
-      borderRadius: 12,
-      padding: "12px 0"
+      padding: "20px 15px",
+      backgroundColor: currentTheme.sidebarBg,
+      borderRight: `1px solid ${currentTheme.border}`,
+      height: "100vh",
+      position: "sticky",
+      top: 0,
+      overflowY: "auto"
     }}>
-      {/* Main Tabs Container */}
-      <nav style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+      {/* Brand */}
+    
+
+      <nav style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
         {mainTabs.map(tab => (
           <div key={tab}>
             
-            {/* Conditional Rendering for DATA UPLOAD & PROCESSING (as a regular button) */}
-            {tab === UPLOAD_PAGE_TITLE ? (
-              <button
-                onClick={() => {
-                  setAllDataOpen(false);
-                  setComparisonsOpen(false);
-                  setActiveTab(tab); // This sets the state to render DataUploadPage
-                  setCurrentPage(1);
-                }}
-                style={{
-                  width: "95%",
-                  padding: "16px 15px",
-                  textAlign: "left",
-                  borderRadius: 12,
-                  border: activeTab === tab ? `2px solid #2563eb` : `1px solid ${currentTheme.border}`,
-                  background: activeTab === tab ? "#2563eb20" : currentTheme.sidebarBg,
-                  cursor: "pointer",
-                  fontWeight: activeTab === tab ? 700 : 500,
-                  color: activeTab === tab ? "#1d4ed8" : currentTheme.textColor,
-                  transition: "all 0.2s",
-                  fontSize: 16,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between"
-                }}
-              >
-                <span>{tab}</span>
-              </button>
-            ) : (
-              // Original logic for all other main tabs (Data Overview, Comparative Analysis, Fault Summary, About)
-              <button
-                onClick={() => {
-                  if(tab === "Data Overview") {
-                    setAllDataOpen(prev => !prev);
-                    setComparisonsOpen(false);
-                    setActiveTab(activeSubTab); 
-                    setCurrentPage(1);
-                  } else if(tab === "Comparative Analysis") {
-                    setComparisonsOpen(prev => !prev);
-                    setAllDataOpen(false);
-                    setActiveTab(activeSubTab); 
-                    setCurrentPage(1);
-                  } else {
-                    setAllDataOpen(false);
-                    setComparisonsOpen(false);
-                    setActiveTab(tab); // Set active tab directly
-                    setCurrentPage(1);
-                  }
-                }}
-                style={{
-                  width: "95%",
-                  padding: "16px 15px",
-                  textAlign: "right",
-                  borderRadius: 12,
-                  border: activeTab === tab ? `2px solid #2563eb` : `1px solid ${currentTheme.border}`,
-                  background: activeTab === tab ? "#2563eb20" : currentTheme.sidebarBg,
-                  cursor: "pointer",
-                  fontWeight: activeTab === tab ? 700 : 500,
-                  color: activeTab === tab ? "#1d4ed8" : currentTheme.textColor,
-                  transition: "all 0.2s",
-                  fontSize: 16,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between"
-                }}
-              >
-                <span>{tab}</span>
-                {(tab === "Data Overview" || tab === "Comparative Analysis") && (
-                  <span>{(tab === "Data Overview" ? allDataOpen : comparisonsOpen) ? "▲" : "▼"}</span>
+            {/* 1. DATA LOGS DROPDOWN */}
+            {tab === "Data Logs" ? (
+              <div>
+                <button 
+                  onClick={() => setOpenSubMenu(openSubMenu === "Logs" ? null : "Logs")} 
+                  style={linkButtonStyle(tab)}
+                >
+                  <Database size={18}/>
+                  <span>{tab}</span>
+                  <span style={{ fontSize: 10, marginLeft: "auto" }}>{openSubMenu === "Logs" ? "▲" : "▼"}</span>
+                </button>
+                {openSubMenu === "Logs" && (
+                  <div style={{ marginTop: 2, display: "flex", flexDirection: "column" }}>
+                    {subTabsDataLogs.map(sub => (
+                      <button key={sub} onClick={() => handleSubTabClick(sub)} style={linkButtonStyle(sub, true)}>
+                         <Target size={14}/> {sub}
+                      </button>
+                    ))}
+                  </div>
                 )}
+              </div>
+            ) 
+
+            /* 2. ANALYSES / COMPARATIVE ANALYSIS DROPDOWN */
+            : tab === "Analyses" ? (
+              <div>
+                <button 
+                  onClick={() => setOpenSubMenu(openSubMenu === "Analyses" ? null : "Analyses")} 
+                  style={linkButtonStyle(tab)}
+                >
+                  <BarChart3 size={18}/>
+                  <span>Comparative</span>
+                  <span style={{ fontSize: 10, marginLeft: "auto" }}>{openSubMenu === "Analyses" ? "▲" : "▼"}</span>
+                </button>
+                {openSubMenu === "Analyses" && (
+                  <div style={{ marginTop: 2, display: "flex", flexDirection: "column" }}>
+                    {subTabsComparisons.map(sub => (
+                      <button key={sub} onClick={() => handleSubTabClick(sub)} style={linkButtonStyle(sub, true)}>
+                         <Layers size={14}/> {sub}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+
+            /* 3. STANDARD TABS */
+            : (
+              <button onClick={() => setActiveTab(tab)} style={linkButtonStyle(tab)}>
+                {tab === "Dashboard" && <LayoutDashboard size={18}/>}
+                {tab === "Fault Summary" && <AlertTriangle size={18}/>}
+                {tab === "Data Upload" && <Target size={18}/>}
+                {tab === "Settings" && <Settings size={18}/>}
+                <span>{tab}</span>
               </button>
-            )}
-
-            {/* Data Overview sub-tabs */}
-            {tab === "Data Overview" && allDataOpen && (
-              <div style={{ position: "relative", marginLeft: 12, marginTop: 6 }}>
-                <div style={{
-                  position: "absolute",
-                  left: 8,
-                  top: 0,
-                  bottom: 0,
-                  width: 2,
-                  backgroundColor: "#2563eb50",
-                  borderRadius: 1
-                }}></div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingLeft: 16 }}>
-                  {subTabsAllData.map(sub => (
-                    <button
-                      key={sub}
-                      onClick={() => handleSubTabClick(sub)}
-                      style={{
-                        width: "95%",
-                        padding: "10px 12px",
-                        textAlign: "left",
-                        borderRadius: 8,
-                        border: activeTab === sub ? `2px solid #2563eb` : `1px solid ${currentTheme.border}`,
-                        background: activeTab === sub ? "#2563eb20" : currentTheme.sidebarBg,
-                        cursor: "pointer",
-                        fontWeight: activeTab === sub ? 700 : 500,
-                        color: activeTab === sub ? "#1d4ed8" : currentTheme.textColor,
-                        transition: "all 0.2s",
-                        fontSize: 14
-                      }}
-                    >
-                      {sub}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Comparative Analysis sub-tabs */}
-            {tab === "Comparative Analysis" && comparisonsOpen && (
-              <div style={{ position: "relative", marginLeft: 12, marginTop: 6 }}>
-                <div style={{
-                  position: "absolute",
-                  left: 8,
-                  top: 0,
-                  bottom: 0,
-                  width: 2,
-                  backgroundColor: "#2563eb50",
-                  borderRadius: 1
-                }}></div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingLeft: 16 }}>
-                  {subTabsComparisons.map(sub => (
-                    <button
-                      key={sub}
-                      onClick={() => handleSubTabClick(sub)}
-                      style={{
-                        width: "95%",
-                        padding: "10px 12px",
-                        textAlign: "left",
-                        borderRadius: 8,
-                        border: activeTab === sub ? `2px solid #2563eb` : `1px solid ${currentTheme.border}`,
-                        background: activeTab === sub ? "#2563eb20" : currentTheme.sidebarBg,
-                        cursor: "pointer",
-                        fontWeight: activeTab === sub ? 700 : 500,
-                        color: activeTab === sub ? "#1d4ed8" : currentTheme.textColor,
-                        transition: "all 0.2s",
-                        fontSize: 14
-                      }}
-                    >
-                      {sub}
-                    </button>
-                  ))}
-                </div>
-              </div>
             )}
           </div>
         ))}
-
-        {/* Home button at the bottom */}
-      <div style={{ marginBottom: 12 }}>
-        <Link to="/" style={{ textDecoration: "none" }}>
-          <button style={{
-            width: "95%",
-            padding: "16px 15px",
-            textAlign: "left",
-            borderRadius: 12,
-            border: activeTab === "Home" ? `2px solid #2563eb` : `1px solid ${currentTheme.border}`,
-            background: activeTab === "Home" ? "#2563eb20" : currentTheme.sidebarBg,
-            cursor: "pointer",
-            fontWeight: activeTab === "Home" ? 700 : 500,
-            color: activeTab === "Home" ? "#1d4ed8" : currentTheme.textColor,
-            transition: "all 0.2s",
-            fontSize: 16,
-          }}>
-            Home
-          </button>
-        </Link>
-      </div>
       </nav>
+
+      {/* Admin Footer */}
+      {isUserAdmin && (
+        <div style={{ borderTop: `1px solid ${currentTheme.border}`, paddingTop: 20 }}>
+          <button style={linkButtonStyle("User Account")}>
+            <UserCircle size={18}/>
+            <span>Admin User</span>
+          </button>
+        </div>
+      )}
     </aside>
   );
 }
