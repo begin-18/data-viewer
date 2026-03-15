@@ -6,41 +6,50 @@ const { google } = require('googleapis');
 const { Readable } = require('stream');
 const csv = require('csv-parser');
 const XLSX = require('xlsx');
+const fs = require('fs');
+const path = require('path');
+const allowedOrigins = [
+  'http://localhost:5173',        // local frontend for testing
+  'https://begin-18.github.io',   // deployed frontend
+];
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-
-// --- Middleware setup ---
+// --- Middleware ---
 app.use(cors({
-    origin: [
-    'https://begin-18.github.io'
-  ]
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like Postman) or from allowedOrigins
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS not allowed from ${origin}`));
+    }
+  },
+  methods: ['GET','POST','PUT','DELETE'],
+  allowedHeaders: ['Content-Type','Authorization'],
 }));
 app.use(express.json());
 
-// Multer setup: use memory storage to handle the file buffer
-const upload = multer({ storage: multer.memoryStorage() });
+// Multer storage
+const upload = multer({ dest: "uploads/" });
 
-// --- Google Sheets Authentication and Service ---
+// --- Google Sheets setup ---
 const auth = new google.auth.JWT({
     email: process.env.CLIENT_EMAIL,
     key: process.env.PRIVATE_KEY.replace(/\\n/g, '\n'),
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
-
 const sheets = google.sheets({ version: 'v4', auth });
 
-// Sheet mapping logic
+// Sheet mapping
 const SHEET_MAPPING = {
     'THERMAL': process.env.THERMAL_SHEET_NAME,
     'ACOUSTIC': process.env.ACOUSTIC_SHEET_NAME,
     'VIBRATION': process.env.VIBRATION_SHEET_NAME,
 };
 
-/**
- * Parses the CSV buffer into an array of arrays for the Sheets API.
- */
+// --- CSV parser ---
 async function parseCsvBuffer(buffer) {
     return new Promise((resolve, reject) => {
         const rows = [];
@@ -73,18 +82,13 @@ async function parseCsvBuffer(buffer) {
     });
 }
 
-/**
- * Appends data to the specified Google Sheet tab.
- */
+// --- Append data to Google Sheets ---
 async function appendDataToSheet(sheetName, values) {
     const range = `${sheetName}!A:Z`;
-
     const valuesToAppend = values.slice(1);
 
-    console.log(`[DEBUG] Attempting to append ${valuesToAppend.length} rows to sheet: ${sheetName}`);
-
     if (valuesToAppend.length === 0) {
-        console.warn(`[WARNING] No data rows found after sanitization. Returning 0 rows written.`);
+        console.warn(`[WARNING] No data rows to append.`);
         return { updates: { updatedRows: 0, updatedCells: 0 } };
     }
 
@@ -93,143 +97,97 @@ async function appendDataToSheet(sheetName, values) {
         range: range,
         valueInputOption: 'USER_ENTERED',
         insertDataOption: 'INSERT_ROWS',
-        resource: {
-            values: valuesToAppend,
-        },
+        resource: { values: valuesToAppend },
     };
 
     const response = await sheets.spreadsheets.values.append(request);
     return response.data;
 }
 
-
-// --- API Route ---
+// --- Upload API ---
 app.post('/api/upload-data', upload.single('file'), async (req, res) => {
-
-    if (!req.file) {
-        return res.status(400).json({ message: 'No file uploaded.' });
-    }
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded.' });
 
     const { dataType } = req.body;
     const sheetName = SHEET_MAPPING[dataType];
     const fileExtension = req.file.originalname.split('.').pop().toLowerCase();
 
-    if (!sheetName) {
-        return res.status(400).json({ message: `Invalid data type specified: ${dataType}` });
-    }
+    if (!sheetName) return res.status(400).json({ message: `Invalid data type: ${dataType}` });
 
     try {
-
         let values;
 
+        // --- CSV / TXT ---
         if (fileExtension === 'csv' || fileExtension === 'txt') {
-
             values = await parseCsvBuffer(req.file.buffer);
-
         }
+
+        // --- JSON ---
         else if (fileExtension === 'json') {
-
             const jsonData = JSON.parse(req.file.buffer.toString());
-
             if (jsonData.length > 0) {
-
                 const headers = Object.keys(jsonData[0]);
-                const dataRows = jsonData.map(obj => headers.map(header => obj[header]));
+                const dataRows = jsonData.map(obj => headers.map(h => obj[h]));
                 values = [headers, ...dataRows];
-
-            } else {
-
-                return res.status(400).json({ message: 'JSON file is empty.' });
-
-            }
-
+            } else return res.status(400).json({ message: 'JSON file is empty.' });
         }
+
+        // --- XLSX ---
         else if (fileExtension === 'xlsx') {
-
             const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-            const sheetNameFromWorkbook = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetNameFromWorkbook];
-
+            const firstSheet = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheet];
             values = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
-
-            if (!values || values.length === 0) {
-
-                return res.status(400).json({ message: 'XLSX file is empty or could not be parsed.' });
-
-            }
-
+            if (!values || values.length === 0) return res.status(400).json({ message: 'XLSX file empty.' });
         }
-        else if (
-            fileExtension === 'wav' ||
-            fileExtension === 'mp3' ||
-            fileExtension === 'mat' ||
-            fileExtension === 'tdms'
-        ) {
+
+        // --- MAT / TDMS (filename parsing) ---
+        else if (fileExtension === 'mat' || fileExtension === 'tdms') {
+            const filename = req.file.originalname;
+            const parts = filename.split("_");
+
+            const torque = parts[0].replace("Nm", "");
+            const condition = parts[1];
+            const magnitude = parts[2] ? parts[2].replace(/(mg|\.mat|\.tdms)/gi,"") : "";
 
             values = [
-                ['Timestamp', 'Filename', 'Size', 'MIME Type'],
-                [
-                    new Date().toISOString(),
-                    req.file.originalname,
-                    `${req.file.size} bytes`,
-                    req.file.mimetype
-                ]
+                ['Timestamp','Torque','Condition','Magnitude'],
+                [new Date().toISOString(), torque, condition, magnitude]
             ];
 
-            console.log(`Received binary file: ${req.file.originalname}. Only logging metadata.`);
-
-        }
-        else {
-
-            return res.status(400).json({ message: `Unsupported file type: ${fileExtension}` });
-
+            console.log(`[INFO] Parsed ${filename} → Torque:${torque}, Condition:${condition}, Magnitude:${magnitude}`);
         }
 
-
-        // --- SANITIZATION STEP ---
-        if (values && values.length > 0) {
-
-            const headers = values[0];
-            const dataRows = values.slice(1);
-
-            const sanitizedDataRows = dataRows.filter(row =>
-                Array.isArray(row) &&
-                row.some(cell =>
-                    cell !== null &&
-                    cell !== undefined &&
-                    String(cell).trim() !== ''
-                )
-            );
-
-            values = [headers, ...sanitizedDataRows];
-
+        // --- WAV / MP3 metadata ---
+        else if (fileExtension === 'wav' || fileExtension === 'mp3') {
+            values = [
+                ['Timestamp','Filename','Size','MIME Type'],
+                [new Date().toISOString(), req.file.originalname, `${req.file.size} bytes`, req.file.mimetype]
+            ];
         }
 
+        // --- Unsupported ---
+        else return res.status(400).json({ message: `Unsupported file type: ${fileExtension}` });
 
+        // --- Sanitize rows ---
+        const headers = values[0];
+        const dataRows = values.slice(1);
+        const sanitizedRows = dataRows.filter(row =>
+            Array.isArray(row) && row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== '')
+        );
+        values = [headers, ...sanitizedRows];
+
+        // --- Append to Google Sheets ---
         const result = await appendDataToSheet(sheetName, values);
+        console.log(`[SUCCESS] Uploaded ${result.updates.updatedRows} rows to ${sheetName}`);
+        res.status(200).json({ message: 'Data successfully uploaded.' });
 
-        console.log(`[SUCCESS] Data uploaded and ${result.updates.updatedRows} rows written to sheet: ${sheetName}`);
-
-        res.status(200).json({
-            message: `Data successfully uploaded`
-        });
-
+    } catch (error) {
+        console.error('[ERROR]', error.message);
+        res.status(500).json({ message: `Upload failed. Error: ${error.message}` });
     }
-    catch (error) {
-
-        console.error('[FAILURE] Processing or Google Sheet Error:', error.message);
-
-        res.status(500).json({
-            message: `Upload failed. Check server logs for details. Error: ${error.message}`
-        });
-
-    }
-
 });
 
-
 app.listen(PORT, () => {
-
-    console.log(`Server running on ${PORT}`);
-
+    console.log(`Server running on port ${PORT}`);
 });
