@@ -3,33 +3,40 @@ const multer = require('multer');
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const cors = require('cors'); // Required to fix the browser block
 
 const app = express();
+
+// --- CORS CONFIGURATION ---
+app.use(cors({
+    origin: 'https://begin-18.github.io', // Your frontend URL
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type']
+}));
+
 const upload = multer({ storage: multer.memoryStorage() });
 
 app.post('/api/upload-data', upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).send('No file uploaded.');
 
-    // UNIQUE FILE IDENTIFIER: Prevents the "Loop/Stuck" data problem
+    // UNIQUE FILE NAME: Prevents the "stuck data" loop
     const uniqueId = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const tempPath = path.join(__dirname, `upload_${uniqueId}.mat`);
 
     try {
-        // Write the buffer to a unique physical file for Python to read
         fs.writeFileSync(tempPath, req.file.buffer);
 
-        // Run the Python Analyzer
+        // Run Python Analyzer
         const pyProcess = spawnSync('python3', [path.join(__dirname, 'read_file.py'), tempPath]);
         
         const output = pyProcess.stdout.toString();
-        if (!output) throw new Error("Python script returned no data");
+        if (!output) throw new Error("Python script returned no data. Check Render logs.");
 
         const result = JSON.parse(output);
 
-        // CLEANUP: Delete the file immediately after reading
+        // CLEANUP: Delete file after processing
         if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
 
-        // Send JSON back to Frontend (including Skewness)
         res.json(result);
 
     } catch (error) {
@@ -40,4 +47,4 @@ app.post('/api/upload-data', upload.single('file'), (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Backend Active on Port ${PORT}`));
+app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
