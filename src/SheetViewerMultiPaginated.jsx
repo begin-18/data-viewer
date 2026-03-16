@@ -60,49 +60,48 @@ export default function SheetViewerMultiPaginated() {
   }
 
   async function fetchDashboardData() {
-    try {
-      const tabName = "New Data Storage"; 
-      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}&v=${Date.now()}`;
-      
-      const res = await fetch(url);
-      if (!res.ok) return;
+  try {
+    const tabName = "New Data Storage"; 
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}&v=${Date.now()}`;
+    
+    const res = await fetch(url);
+    if (!res.ok) return;
 
-      const text = await res.text();
-      const rows = parseGvizText(text);
+    const text = await res.text();
+    const rows = parseGvizText(text);
 
-      if (rows && rows.length > 0) {
-        const lastRow = rows[rows.length - 1];
+    if (rows && rows.length > 0) {
+      const lastRow = rows[rows.length - 1];
 
-        // Symmetrical Mapping: Use the same columns for both because they share the same headers in your sheet
-        setLatestData({
-          Timestamp: pick(lastRow, ["timestamp", "time"]),
-          
-          // Vibration Mapping
-          vibRMS: parseFloat(pick(lastRow, ["rms"])) || 0,
-          vibKurtosis: parseFloat(pick(lastRow, ["kurtosis"])) || 0,
-          vibSkewness: parseFloat(pick(lastRow, ["skewness"])) || 0,
-          vibPeak: parseFloat(pick(lastRow, ["peak amp", "peak_amp"])) || 0,
+      setLatestData({
+        Timestamp: pick(lastRow, ["timestamp", "time"]),
+        
+        // VIBRATION DATA MAPPING
+        vibRMS: parseFloat(pick(lastRow, ["rms"])) || 0,
+        vibKurtosis: parseFloat(pick(lastRow, ["kurtosis"])) || 0,
+        vibSkewness: parseFloat(pick(lastRow, ["skewness"])) || 0,
+        vibPeak: parseFloat(pick(lastRow, ["peak amp", "peak_amp"])) || 0,
 
-          // Acoustic Mapping (Using the same logic/columns since they are the same multimodal data)
-          acRMS: parseFloat(pick(lastRow, ["rms"])) || 0,
-          acKurtosis: parseFloat(pick(lastRow, ["kurtosis"])) || 0,
-          acSkewness: parseFloat(pick(lastRow, ["skewness"])) || 0,
-          acPeak: parseFloat(pick(lastRow, ["peak amp", "peak_amp"])) || 0,
+        // ACOUSTIC DATA MAPPING
+        acRMS: parseFloat(pick(lastRow, ["rms"])) || 0,
+        acKurtosis: parseFloat(pick(lastRow, ["kurtosis"])) || 0,
+        acSkewness: parseFloat(pick(lastRow, ["skewness"])) || 0,
+        acPeak: parseFloat(pick(lastRow, ["peak amp", "peak_amp"])) || 0,
 
-          Temperature: parseFloat(pick(lastRow, ["temperature", "temp"])) || 0,
-          "Status (0/1)": lastRow["Status"] ?? lastRow["status"]
-        });
+        Temperature: parseFloat(pick(lastRow, ["temperature", "temp"])) || 0,
+        "Status (0/1)": lastRow["Status"] ?? lastRow["status"]
+      });
 
-        setChartLogs({
-          Vibration: rows.slice(-20).map(r => parseFloat(pick(r, ["rms"])) || 0),
-          Acoustic: rows.slice(-20).map(r => parseFloat(pick(r, ["peak amp", "peak_amp"])) || 0),
-          Thermal: rows.slice(-20).map(r => parseFloat(pick(r, ["temperature"])) || 0)
-        });
-      }
-    } catch (err) { 
-      console.error("Dashboard Sync Error:", err); 
+      setChartLogs({
+        Vibration: rows.slice(-20).map(r => parseFloat(pick(r, ["rms"])) || 0),
+        Acoustic: rows.slice(-20).map(r => parseFloat(pick(r, ["peak amp", "peak_amp"])) || 0), 
+        Thermal: rows.slice(-20).map(r => parseFloat(pick(r, ["temperature"])) || 0)
+      });
     }
+  } catch (err) { 
+    console.error("Dashboard Sync Error:", err); 
   }
+}
 
   async function fetchAll() {
     setLoading(true);
