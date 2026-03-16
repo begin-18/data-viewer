@@ -41,7 +41,7 @@ app.post('/api/upload-data', upload.single('file'), async (req, res) => {
 
   try {
     // Run Python script
-    const py = spawnSync('python', [path.join(__dirname, 'read_file.py'), tempPath]);
+    const py = spawnSync('python3', [path.join(__dirname, 'read_file.py'), tempPath]);
     const output = py.stdout?.toString().trim();
     const errorOutput = py.stderr?.toString().trim();
 

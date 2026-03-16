@@ -2,6 +2,12 @@ import sys
 import json
 import os
 import numpy as np
+
+# --- EMERGENCY FIX FOR NUMPY 2.0 / PYTHON 3.14 ---
+if not hasattr(np, 'bool8'):
+    np.bool8 = np.bool_
+# ------------------------------------------------
+
 from scipy import stats
 from scipy.io import loadmat
 from nptdms import TdmsFile
