@@ -39,9 +39,13 @@ const Dashboard = ({ latestData, chartLogs, allRows, currentTheme, onSelectData,
     );
   }
 
-  // LOGIC: Check the specific "Status (0/1)" column from your sheet
-  const statusValue = latestData["Status (0/1)"]; 
-  const isHealthy = String(statusValue) === "0" || statusValue === 0;
+  // UPDATED LOGIC: Bulletproof check for the "Status (0/1)" value
+  const statusValue = latestData["Status (0/1)"] ?? latestData["Status"]; 
+  const isHealthy = statusValue !== undefined && statusValue !== null && (
+    statusValue === 0 || 
+    statusValue === "0" || 
+    String(statusValue).trim() === "0"
+  );
 
   const cardBg = 'rgba(30, 41, 59, 0.7)'; 
   const textMuted = '#94a3b8';
@@ -51,7 +55,7 @@ const Dashboard = ({ latestData, chartLogs, allRows, currentTheme, onSelectData,
   return (
     <div style={{ padding: "30px", backgroundColor: '#0f172a', minHeight: '100vh', color: '#f8fafc' }}>
       
-      {/* 1. FAULT DETECTION BANNER - Appears when status is 1 */}
+      {/* 1. FAULT DETECTION BANNER - Appears when status is NOT healthy */}
       {!isHealthy && (
         <div style={{
           border: `1px solid ${anomalyColor}`,
@@ -170,9 +174,13 @@ const Dashboard = ({ latestData, chartLogs, allRows, currentTheme, onSelectData,
             </div>
           ) : (
             allRows.map((row, index) => {
-              // Row level check for history items using the column label
-              const rowStatus = row["Status (0/1)"];
-              const isRowHealthy = String(rowStatus) === "0" || rowStatus === 0;
+              // Row level check: Updated to use the same bulletproof logic
+              const rowStat = row["Status (0/1)"] ?? row["Status"];
+              const isRowHealthy = rowStat !== undefined && (
+                rowStat === 0 || 
+                rowStat === "0" || 
+                String(rowStat).trim() === "0"
+              );
               
               return (
                 <div 
@@ -206,7 +214,7 @@ const Dashboard = ({ latestData, chartLogs, allRows, currentTheme, onSelectData,
                          <Clock size={16} color={latestData.Timestamp === row.timestamp ? "#38bdf8" : textMuted} />
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>Log_{row.timestamp.replace(/[/ :]/g, '_')}</div>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>Log_{row.timestamp?.replace(/[/ :]/g, '_')}</div>
                         <div style={{ fontSize: '0.75rem', color: textMuted }}>{row.timestamp}</div>
                       </div>
                     </div>
@@ -250,7 +258,7 @@ const Dashboard = ({ latestData, chartLogs, allRows, currentTheme, onSelectData,
   );
 };
 
-// Sub-components
+// Sub-components (unchanged but included for full file structure)
 const MetricRow = ({ label, value }) => (
   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
     <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{label}</span>

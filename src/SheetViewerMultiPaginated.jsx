@@ -17,7 +17,6 @@ ChartJS.register(ArcElement, Tooltip, Legend);
 const SHEET_ID = "1wDkNRGrKvYehMI4f8Ks4RLoncGHrs7xWDg8Dy2d5Tk8";
 const DEFAULT_PAGE_SIZE = 100;
 
-// Utility to keep numbers clean
 const roundTo8Decimals = (val) => {
   if (val === null || val === undefined || val === "") return "0.00000000";
   const num = parseFloat(val);
@@ -42,7 +41,6 @@ export default function SheetViewerMultiPaginated() {
   const [currentPage, setCurrentPage] = useState(1);
   const [theme, setTheme] = useState("dark");
 
-  // DASHBOARD DATA STATE
   const [latestData, setLatestData] = useState(null);
   const [chartLogs, setChartLogs] = useState({ Vibration: [], Acoustic: [], Thermal: [] });
 
@@ -57,19 +55,17 @@ export default function SheetViewerMultiPaginated() {
     color:"#fff", cursor:"pointer", fontWeight:600
   };
 
-  // --- FETCHING LOGIC ---
-
   async function fetchSheetTab(tabName) {
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}`;
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}&tbe=${Date.now()}`;
     const res = await fetch(url);
     const text = await res.text();
     return parseGvizText(text);
   }
 
-  // UPDATED: Fetch specifically from New Data Storage for the Dashboard
   async function fetchDashboardData() {
     try {
-      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=New%20Data%20Storage`;
+      // Added &tbe=${Date.now()} to bypass Google's cache so you see the upload immediately
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=New%20Data%20Storage&tbe=${Date.now()}`;
       const res = await fetch(url);
       const text = await res.text();
       const rows = parseGvizText(text);
@@ -77,7 +73,7 @@ export default function SheetViewerMultiPaginated() {
       if (rows && rows.length > 0) {
         const lastRow = rows[rows.length - 1];
         
-        // Match the exact Google Sheet Header "Status (0/1)"
+        // We use pick to find the status regardless of small naming changes
         const rawStatus = pick(lastRow, ["Status (0/1)", "status", "Status"]);
 
         setLatestData({
@@ -87,8 +83,8 @@ export default function SheetViewerMultiPaginated() {
           Skewness: parseFloat(pick(lastRow, ["skewness"])) || 0,
           PeakAmp: parseFloat(pick(lastRow, ["peak amp", "peak_amp"])) || 0,
           Temperature: parseFloat(pick(lastRow, ["temperature", "temp"])) || 0,
-          // Explicitly map the status to the property Dashboard expects
-          "Status (0/1)": rawStatus 
+          // CRITICAL: We pass it as "Status" for simplicity in Dashboard.jsx
+          Status: rawStatus 
         });
 
         setChartLogs({
@@ -146,21 +142,11 @@ export default function SheetViewerMultiPaginated() {
     return () => clearInterval(id);
   }, []);
 
-  // --- DATA TRANSFORMATION FOR TABLE ---
-
   const rows = useMemo(() => {
     if (["Dashboard", "Data Upload", "About", "Fault Summary"].includes(activeTab)) return [];
-    
-    if (activeTab === "Vibration × Acoustic") {
-      return mergedRows.map(r => ({ timestamp: r.timestamp, vibration_x: r.vibration_x, vibration_y: r.vibration_y, vibration_z: r.vibration_z, acoustic_level: r.acoustic_level, fault_type: r.fault_type }));
-    }
-    if (activeTab === "Vibration × Thermal") {
-      return mergedRows.map(r => ({ timestamp: r.timestamp, vibration_x: r.vibration_x, vibration_y: r.vibration_y, vibration_z: r.vibration_z, temperature: r.temperature, fault_type: r.fault_type }));
-    }
-    if (activeTab === "Vibration × Acoustic × Thermal" || activeTab === "All Data") {
-      return mergedRows;
-    }
-
+    if (activeTab === "Vibration × Acoustic") return mergedRows.map(r => ({ timestamp: r.timestamp, vibration_x: r.vibration_x, vibration_y: r.vibration_y, vibration_z: r.vibration_z, acoustic_level: r.acoustic_level, fault_type: r.fault_type }));
+    if (activeTab === "Vibration × Thermal") return mergedRows.map(r => ({ timestamp: r.timestamp, vibration_x: r.vibration_x, vibration_y: r.vibration_y, vibration_z: r.vibration_z, temperature: r.temperature, fault_type: r.fault_type }));
+    if (activeTab === "Vibration × Acoustic × Thermal" || activeTab === "All Data") return mergedRows;
     return allRows.filter(r => r._tab === activeTab);
   }, [allRows, mergedRows, activeTab]);
 
@@ -180,39 +166,13 @@ export default function SheetViewerMultiPaginated() {
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: currentTheme.background, color: currentTheme.textColor, overflow: "hidden" }}>
       <Header theme={theme} setTheme={setTheme} currentTheme={currentTheme} />
-      
       <div style={{ display: "flex", flex: "1", overflow: "hidden", padding: 18, gap: 14 }}>
-        <Sidebar 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab} 
-          setCurrentPage={setCurrentPage} 
-          currentTheme={currentTheme}
-        />
-
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} setCurrentPage={setCurrentPage} currentTheme={currentTheme} />
         <main style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12, overflowY: "auto" }}>
-          {activeTab === "Dashboard" && (
-            <Dashboard latestData={latestData} chartLogs={chartLogs} currentTheme={currentTheme} />
+          {activeTab === "Dashboard" && <Dashboard latestData={latestData} chartLogs={chartLogs} currentTheme={currentTheme} />}
+          {[ "Thermal Data", "Acoustic Data", "Vibration Data", "All Data", "Vibration × Acoustic", "Vibration × Thermal", "Vibration × Acoustic × Thermal" ].includes(activeTab) && (
+            <TableView pageRows={pageRows} displayCols={displayCols} currentPage={currentPage} pageSize={pageSize} totalPages={totalPages} setCurrentPage={setCurrentPage} setPageSize={setPageSize} fetchAll={fetchAll} currentTheme={currentTheme} btnStyle={btnStyle} />
           )}
-
-          {[
-            "Thermal Data", "Acoustic Data", "Vibration Data", 
-            "All Data", "Vibration × Acoustic", 
-            "Vibration × Thermal", "Vibration × Acoustic × Thermal"
-          ].includes(activeTab) && (
-            <TableView
-              pageRows={pageRows}
-              displayCols={displayCols}
-              currentPage={currentPage}
-              pageSize={pageSize}
-              totalPages={totalPages}
-              setCurrentPage={setCurrentPage}
-              setPageSize={setPageSize}
-              fetchAll={fetchAll}
-              currentTheme={currentTheme}
-              btnStyle={btnStyle}
-            />
-          )}
-
           {activeTab === "Data Upload" && <DataUploadPage currentTheme={currentTheme} />}
           {activeTab === "Fault Summary" && <FaultSummary allRows={allRows} currentTheme={currentTheme} />}
           {activeTab === "About" && <About currentTheme={currentTheme} />}
