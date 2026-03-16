@@ -360,7 +360,15 @@ export default function SheetViewerMultiPaginated() {
 
           {activeTab === "Data Upload" && <DataUploadPage currentTheme={currentTheme} />}
 
-          {activeTab === "Fault Summary" && <FaultSummary allRows={allRows} currentTheme={currentTheme} />}
+          {/* Replace the old FaultSummary line with this: */}
+          {activeTab === "Fault Summary" && (
+            <FaultSummary 
+              thermalData={allRows.filter(r => r._tab === "Thermal Data")}
+              acousticData={allRows.filter(r => r._tab === "Acoustic Data")}
+              vibrationData={allRows.filter(r => r._tab === "Vibration Data")}
+              currentTheme={currentTheme} 
+            />
+          )}
 
           {activeTab === "About" && <About currentTheme={currentTheme} />}
 

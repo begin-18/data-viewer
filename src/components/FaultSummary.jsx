@@ -1,102 +1,121 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Pie } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
+import { Activity, AlertTriangle, CheckCircle2, Thermometer, Database } from "lucide-react";
 
-// Ensure ChartJS is registered inside the component to prevent missing element errors
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-export default function FaultSummary({ faultCounts, allRows, currentTheme }) {
-  
-  // 1. PREVENT CRASH: If data hasn't arrived yet, show a loading message instead of a white screen
-  if (!allRows || allRows.length === 0 || !faultCounts) {
-    return (
-      <div style={{ 
-        padding: "50px", 
-        textAlign: "center", 
-        color: currentTheme?.textColor || "#fff",
-        background: currentTheme?.background || "#0f172a",
-        height: "100%"
-      }}>
-        <h2 style={{ animate: "pulse 2s infinite" }}>Analyzing Sensor Data...</h2>
-        <p style={{ opacity: 0.7 }}>Synchronizing with Google Sheets API</p>
-      </div>
-    );
-  }
+// Professional typography style object
+const fontStyle = {
+  fontFamily: "'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+  letterSpacing: "-0.01em"
+};
 
-  // 2. DATA PREPARATION: Safety check for each count
-  const data = {
+export default function FaultSummary({ thermalData = [], acousticData = [], vibrationData = [], currentTheme }) {
+  
+  const stats = useMemo(() => {
+    const counts = { Normal: 0, Imbalance: 0, "Bearing Fault": 0, Overheating: 0 };
+    
+    [thermalData, acousticData, vibrationData].forEach(dataset => {
+      dataset.forEach(row => {
+        const type = row.fault_type;
+        if (counts.hasOwnProperty(type)) {
+          counts[type]++;
+        }
+      });
+    });
+
+    const total = thermalData.length + acousticData.length + vibrationData.length;
+    return { counts, total };
+  }, [thermalData, acousticData, vibrationData]);
+
+  const chartData = {
     labels: ["Normal", "Imbalance", "Bearing Fault", "Overheating"],
-    datasets: [
-      {
-        data: [
-          faultCounts.Normal || 0,
-          faultCounts.Imbalance || 0,
-          faultCounts["Bearing Fault"] || 0,
-          faultCounts.Overheating || 0,
-        ],
-        backgroundColor: ["#10b981", "#f59e0b", "#ef4444", "#8b5cf6"],
-        hoverOffset: 10,
-        borderWidth: 0,
-      },
-    ],
+    datasets: [{
+      data: [stats.counts.Normal, stats.counts.Imbalance, stats.counts["Bearing Fault"], stats.counts.Overheating],
+      backgroundColor: ["#10b981", "#f59e0b", "#ef4444", "#8b5cf6"],
+      hoverOffset: 20,
+      borderWidth: 0
+    }]
   };
 
   return (
-    <div style={{ padding: "20px", animation: "fadeIn 0.5s ease-in" }}>
-      <h2 style={{ marginBottom: "20px", color: currentTheme.textColor }}>
-        System Health & Fault Distribution
-      </h2>
-      
-      <div style={{ 
-        display: "grid", 
-        gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", 
-        gap: "20px" 
-      }}>
-        
-        {/* CHART CARD */}
+    <div style={{ ...fontStyle, padding: "24px", color: currentTheme.textColor, animation: "fadeIn 0.5s ease" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "32px" }}>
+        <div>
+            <h2 style={{ fontSize: "2.25rem", fontWeight: "800", margin: 0, letterSpacing: "-0.04em" }}>
+                Diagnostic Summary
+            </h2>
+            <p style={{ color: "#64748b", margin: "4px 0 0 0", fontSize: "0.95rem", fontWeight: "500" }}>
+                Multimodal Fusion Engine: <span style={{ color: currentTheme.textColor }}>{stats.total.toLocaleString()} Records</span>
+            </p>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "32px" }}>
+        {/* CHART SECTION */}
         <div style={{ 
           background: currentTheme.cardBg, 
-          padding: "30px", 
-          borderRadius: "15px", 
-          border: `1px solid ${currentTheme.border}`,
-          display: "flex",
-          justifyContent: "center"
+          padding: "48px", 
+          borderRadius: "32px", 
+          border: `1px solid ${currentTheme.border}`, 
+          height: "420px",
+          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)"
         }}>
-          <div style={{ width: "100%", maxWidth: "300px" }}>
-            <Pie data={data} options={{ plugins: { legend: { position: 'bottom', labels: { color: currentTheme.textColor } } } }} />
-          </div>
+          {stats.total > 0 ? (
+            <Pie data={chartData} options={{ 
+                maintainAspectRatio: false, 
+                plugins: { 
+                    legend: { 
+                        position: 'bottom', 
+                        labels: { 
+                            color: "#94a3b8", 
+                            padding: 24, 
+                            font: { family: fontStyle.fontFamily, size: 13, weight: '600' },
+                            usePointStyle: true
+                        } 
+                    } 
+                } 
+            }} />
+          ) : (
+            <div style={{ textAlign: "center", paddingTop: "120px", color: "#64748b", fontWeight: "600" }}>
+                Initializing Data Fusion...
+            </div>
+          )}
         </div>
 
-        {/* STATS CARD */}
-        <div style={{ 
-          background: currentTheme.cardBg, 
-          padding: "30px", 
-          borderRadius: "15px", 
-          border: `1px solid ${currentTheme.border}`,
-          display: "flex",
-          flexDirection: "column",
-          gap: "15px"
-        }}>
-          <h3 style={{ margin: 0, opacity: 0.8 }}>Detection Summary</h3>
-          <div style={{ fontSize: "24px", fontWeight: "bold" }}>{allRows.length} Total Logs</div>
+        {/* CARDS SECTION */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <StatCard label="Normal" val={stats.counts.Normal} total={stats.total} color="#10b981" icon={<CheckCircle2 size={20}/>} currentTheme={currentTheme} />
+          <StatCard label="Imbalance" val={stats.counts.Imbalance} total={stats.total} color="#f59e0b" icon={<Activity size={20}/>} currentTheme={currentTheme} />
+          <StatCard label="Bearing Fault" val={stats.counts["Bearing Fault"]} total={stats.total} color="#ef4444" icon={<AlertTriangle size={20}/>} currentTheme={currentTheme} />
+          <StatCard label="Overheating" val={stats.counts.Overheating} total={stats.total} color="#8b5cf6" icon={<Thermometer size={20}/>} currentTheme={currentTheme} />
           
-          <hr style={{ border: `0.5px solid ${currentTheme.border}`, width: "100%" }} />
-          
-          <div style={{ display: "flex", justifyContent: "space-between", color: "#10b981" }}>
-            <span>Normal Operation:</span> <strong>{faultCounts.Normal || 0}</strong>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", color: "#f59e0b" }}>
-            <span>Imbalance Detected:</span> <strong>{faultCounts.Imbalance || 0}</strong>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", color: "#ef4444" }}>
-            <span>Bearing Failures:</span> <strong>{faultCounts["Bearing Fault"] || 0}</strong>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", color: "#8b5cf6" }}>
-            <span>Thermal Issues:</span> <strong>{faultCounts.Overheating || 0}</strong>
+          <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: "8px", color: "#64748b", fontSize: "0.8rem", fontWeight: "600" }}>
+            <Database size={14} /> 
+            <span style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>Fused Analytics System v2.0</span>
           </div>
         </div>
-
       </div>
     </div>
   );
 }
+
+const StatCard = ({ label, val, total, color, icon, currentTheme }) => (
+  <div style={{ 
+    display: "flex", justifyContent: "space-between", alignItems: "center", 
+    padding: "20px 28px", background: currentTheme.cardBg, borderRadius: "20px", border: `1px solid ${currentTheme.border}`,
+    transition: "transform 0.2s ease"
+  }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+      <div style={{ color, display: "flex" }}>{icon}</div>
+      <span style={{ fontWeight: "600", fontSize: "1rem" }}>{label}</span>
+    </div>
+    <div style={{ textAlign: "right" }}>
+      <div style={{ fontWeight: "800", fontSize: "1.35rem", lineHeight: "1" }}>{val.toLocaleString()}</div>
+      <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: "700", marginTop: "4px" }}>
+        {total > 0 ? ((val/total)*100).toFixed(1) : 0}%
+      </div>
+    </div>
+  </div>
+);
