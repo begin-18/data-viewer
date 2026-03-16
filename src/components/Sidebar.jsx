@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { LayoutDashboard, Database, BarChart3, AlertTriangle, Settings, UserCircle, Target, Layers } from "lucide-react";
 
 export default function Sidebar({ activeTab, setActiveTab, currentTheme, isUserAdmin }) {
-  const mainTabs = ["Dashboard", "Data Logs", "Analyses", "Fault Summary", "Data Upload", "Settings"];
+  const mainTabs = ["Dashboard", "Data Logs", "Analyses", "Fault Summary", "Data Upload"];
   
   const subTabsDataLogs = ["Thermal Data", "Acoustic Data", "Vibration Data"];
   
@@ -112,7 +112,6 @@ export default function Sidebar({ activeTab, setActiveTab, currentTheme, isUserA
                 {tab === "Dashboard" && <LayoutDashboard size={18}/>}
                 {tab === "Fault Summary" && <AlertTriangle size={18}/>}
                 {tab === "Data Upload" && <Target size={18}/>}
-                {tab === "Settings" && <Settings size={18}/>}
                 <span>{tab}</span>
               </button>
             )}
