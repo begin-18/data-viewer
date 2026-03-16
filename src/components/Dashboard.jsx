@@ -113,11 +113,13 @@ const Dashboard = ({ latestData, chartLogs, allRows, onSelectData, onDeleteFile,
         <MetricCard title="Vibration" icon={<Activity size={20} color="#c084fc"/>} status={isHealthy ? "Healthy" : "Faulty"} statusColor={isHealthy ? successColor : anomalyColor} bgColor={cardBg} chartData={chartLogs?.Vibration || []} lineColor="#c084fc">
           <MetricRow label="RMS" value={latestData.RMS?.toFixed(4)}/>
           <MetricRow label="Kurtosis" value={latestData.Kurtosis?.toFixed(4)}/>
+          <MetricRow label="Peak Amp" value={latestData.PeakAmp?.toFixed(4)}/>
         </MetricCard>
 
         {/* ACOUSTIC */}
         <MetricCard title="Acoustic" icon={<Mic size={20} color="#38bdf8"/>} status={isHealthy ? "Healthy" : "Faulty"} statusColor={isHealthy ? successColor : anomalyColor} bgColor={cardBg} chartData={chartLogs?.Acoustic || []} lineColor="#38bdf8">
-          <MetricRow label="Acoustic Level" value={latestData.Acoustic?.toFixed(4)}/>
+          <MetricRow label="RMS" value={latestData.RMS?.toFixed(4)}/>
+          <MetricRow label="Kurtosis" value={latestData.Kurtosis?.toFixed(4)}/>
           <MetricRow label="Peak Amp" value={latestData.PeakAmp?.toFixed(4)}/>
         </MetricCard>
 
