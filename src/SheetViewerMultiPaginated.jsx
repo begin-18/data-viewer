@@ -63,44 +63,41 @@ export default function SheetViewerMultiPaginated() {
   }
 
   async function fetchDashboardData() {
-  try {
-    // TAB NAME: Matches the name at the bottom of your Google Sheet
-    const tabName = "New Data Storage"; 
-    
-    // CACHE BUSTER: The &v=${Date.now()} forces Google to show the FRESH upload immediately
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}&v=${Date.now()}`;
-    
-    const res = await fetch(url);
-    if (!res.ok) return;
+    try {
+      const tabName = "New Data Storage"; 
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}&v=${Date.now()}`;
+      
+      const res = await fetch(url);
+      if (!res.ok) return;
 
-    const text = await res.text();
-    const rows = parseGvizText(text);
+      const text = await res.text();
+      const rows = parseGvizText(text);
 
-    if (rows && rows.length > 0) {
-      const lastRow = rows[rows.length - 1];
+      if (rows && rows.length > 0) {
+        const lastRow = rows[rows.length - 1];
 
-      setLatestData({
-        Timestamp: pick(lastRow, ["timestamp", "time"]),
-        RMS: parseFloat(pick(lastRow, ["rms"])) || 0,
-        Kurtosis: parseFloat(pick(lastRow, ["kurtosis"])) || 0,
-        Skewness: parseFloat(pick(lastRow, ["skewness"])) || 0,
-        PeakAmp: parseFloat(pick(lastRow, ["peak amp", "peak_amp"])) || 0,
-        Temperature: parseFloat(pick(lastRow, ["temperature", "temp"])) || 0,
-        
-        // MAPPING: Looks for your specific "Status" column
-        "Status (0/1)": lastRow["Status"] ?? lastRow["status"]
-      });
+        setLatestData({
+          Timestamp: pick(lastRow, ["timestamp", "time"]),
+          RMS: parseFloat(pick(lastRow, ["rms"])) || 0,
+          Kurtosis: parseFloat(pick(lastRow, ["kurtosis"])) || 0,
+          Skewness: parseFloat(pick(lastRow, ["skewness"])) || 0,
+          PeakAmp: parseFloat(pick(lastRow, ["peak amp", "peak_amp"])) || 0,
+          Temperature: parseFloat(pick(lastRow, ["temperature", "temp"])) || 0,
+          
+          // STRICT MAPPING: Looks for 'Status' exactly as in your image
+          "Status (0/1)": lastRow["Status"] !== undefined ? lastRow["Status"] : lastRow["status"]
+        });
 
-      setChartLogs({
-        Vibration: rows.slice(-20).map(r => parseFloat(pick(r, ["rms"])) || 0),
-        Thermal: rows.slice(-20).map(r => parseFloat(pick(r, ["temperature"])) || 0),
-        Acoustic: rows.slice(-20).map(r => parseFloat(pick(r, ["acoustic_level"])) || 0) 
-      });
+        setChartLogs({
+          Vibration: rows.slice(-20).map(r => parseFloat(pick(r, ["rms"])) || 0),
+          Thermal: rows.slice(-20).map(r => parseFloat(pick(r, ["temperature"])) || 0),
+          Acoustic: rows.slice(-20).map(r => parseFloat(pick(r, ["acoustic_level"])) || 0) 
+        });
+      }
+    } catch (err) { 
+      console.error("Dashboard Sync Error:", err); 
     }
-  } catch (err) { 
-    console.error("Dashboard Sync Error:", err); 
   }
-}
 
   async function fetchAll() {
     setLoading(true);

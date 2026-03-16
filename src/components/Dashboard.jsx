@@ -24,7 +24,7 @@ const Dashboard = ({ latestData, chartLogs, allRows, onSelectData, onDeleteFile,
   // --- UPDATED IF/ELSE LOGIC ---
   const statusValue = latestData["Status (0/1)"]; 
   
-  // Logic: 0 = Healthy, anything else = Faulty
+  // Logic: 0 = Healthy, 1 (or anything else) = Faulty
   const isHealthy = statusValue !== undefined && (
     statusValue === 0 || 
     statusValue === "0" || 
@@ -39,30 +39,31 @@ const Dashboard = ({ latestData, chartLogs, allRows, onSelectData, onDeleteFile,
   return (
     <div style={{ padding: "30px", backgroundColor: '#0f172a', minHeight: '100vh', color: '#f8fafc' }}>
       
-      {/* 1. ANOMALY BANNER: IF NOT Healthy, SHOW THIS */}
+      {/* 1. ANOMALY BANNER: Only shows when isHealthy is FALSE (Status 1) */}
       {!isHealthy && (
         <div style={{
-          border: `1px solid ${anomalyColor}`,
-          background: 'rgba(239, 68, 68, 0.1)',
+          border: `2px solid ${anomalyColor}`,
+          background: 'rgba(239, 68, 68, 0.15)',
           borderRadius: 16,
           padding: '24px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '30px'
+          marginBottom: '30px',
+          boxShadow: `0 0 20px ${anomalyColor}33`
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            <AlertTriangle size={28} color={anomalyColor} />
+            <AlertTriangle size={32} color={anomalyColor} />
             <div>
-              <h3 style={{ color: anomalyColor, margin: 0, fontWeight: 800 }}>ANOMALY DETECTED</h3>
-              <p style={{ color: textMuted, margin: 0 }}>Component failure detected by fusion engine.</p>
+              <h3 style={{ color: anomalyColor, margin: 0, fontWeight: 800, fontSize: '1.5rem' }}>ANOMALY DETECTED</h3>
+              <p style={{ color: textMuted, margin: 0 }}>System state identified as FAULTY by Multimodal Fusion.</p>
             </div>
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: 900 }}>FAULTY</div>
+          <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#fff' }}>FAULTY</div>
         </div>
       )}
 
-      {/* 2. TOP STATUS BAR: Changes Color Based on isHealthy */}
+      {/* 2. TOP STATUS BAR */}
       <div style={{
         backgroundColor: isHealthy ? 'rgba(74, 222, 128, 0.05)' : 'rgba(239, 68, 68, 0.05)',
         border: `1px solid ${isHealthy ? successColor : anomalyColor}`,
@@ -75,14 +76,14 @@ const Dashboard = ({ latestData, chartLogs, allRows, onSelectData, onDeleteFile,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           {isHealthy ? <CheckCircle size={22} color={successColor}/> : <Zap size={22} color={anomalyColor}/>}
-          <h4 style={{ color: isHealthy ? successColor : anomalyColor, margin: 0 }}>
+          <h4 style={{ color: isHealthy ? successColor : anomalyColor, margin: 0, fontSize: '1.2rem' }}>
             Equipment Operating: {isHealthy ? "Healthy" : "Faulty"}
           </h4>
         </div>
-        <div style={{ color: textMuted }}>{latestData.Timestamp}</div>
+        <div style={{ color: textMuted, fontWeight: 'bold' }}>{latestData.Timestamp}</div>
       </div>
 
-      {/* 3. METRIC GRID (Values stay green, but Card Status Labels update) */}
+      {/* 3. METRIC GRID */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '40px' }}>
         <MetricCard title="Vibration" icon={<Activity size={20} color="#c084fc"/>} status={isHealthy ? "Healthy" : "Faulty"} statusColor={isHealthy ? successColor : anomalyColor} bgColor={cardBg} chartData={chartLogs?.Vibration || []} lineColor="#c084fc">
           <MetricRow label="RMS" value={latestData.RMS?.toFixed(4)}/>
@@ -97,15 +98,15 @@ const Dashboard = ({ latestData, chartLogs, allRows, onSelectData, onDeleteFile,
         </MetricCard>
       </div>
       
-      {/* 4. HISTORY SECTION: Update row styles with the same logic */}
+      {/* 4. HISTORY SECTION */}
       <div style={{ background: cardBg, borderRadius: 20, padding: '30px', border: `1px solid #334155` }}>
         <h3 style={{ marginBottom: 20 }}>Analysis Repository</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {allRows?.map((row, index) => {
+          {allRows?.slice(0, 10).map((row, index) => {
             const rowVal = row["Status"] ?? row["Status (0/1)"];
             const isRowHealthy = String(rowVal).trim() === "0" || rowVal === 0;
             return (
-              <div key={index} style={{ display: 'flex', justifyContent: 'space-between', padding: 16, background: 'rgba(15, 23, 42, 0.3)', borderRadius: 12, border: '1px solid #334155' }}>
+              <div key={index} style={{ display: 'flex', justifyContent: 'space-between', padding: 16, background: 'rgba(15, 23, 42, 0.3)', borderRadius: 12, border: `1px solid ${isRowHealthy ? '#334155' : anomalyColor}` }}>
                 <span>{row.timestamp}</span>
                 <span style={{ color: isRowHealthy ? successColor : anomalyColor, fontWeight: 'bold' }}>
                   {isRowHealthy ? 'Healthy' : 'Faulty'}
@@ -119,7 +120,6 @@ const Dashboard = ({ latestData, chartLogs, allRows, onSelectData, onDeleteFile,
   );
 };
 
-// Sub-components
 const MetricRow = ({ label, value }) => (
   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
     <span style={{ color: '#94a3b8' }}>{label}</span>
