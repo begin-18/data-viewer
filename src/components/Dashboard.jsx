@@ -11,7 +11,7 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
-const Dashboard = ({ latestData, chartLogs, allRows, onSelectData, onDeleteFile, onClearHistory }) => {
+const Dashboard = ({ latestData, chartLogs }) => {
   
   if (!latestData) {
     return (
@@ -21,13 +21,8 @@ const Dashboard = ({ latestData, chartLogs, allRows, onSelectData, onDeleteFile,
     );
   }
 
-  // --- STATUS LOGIC ---
   const statusValue = latestData["Status (0/1)"]; 
-  const isHealthy = statusValue !== undefined && (
-    statusValue === 0 || 
-    statusValue === "0" || 
-    String(statusValue).trim() === "0"
-  );
+  const isHealthy = String(statusValue).trim() === "0";
 
   const successColor = '#4ade80';
   const anomalyColor = '#ef4444';
@@ -37,93 +32,51 @@ const Dashboard = ({ latestData, chartLogs, allRows, onSelectData, onDeleteFile,
   return (
     <div style={{ padding: "30px", backgroundColor: '#0f172a', minHeight: '100vh', color: '#f8fafc' }}>
       
-      {/* HEADER WITH REFRESH BUTTON */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>System Monitor</h2>
         <button 
           onClick={() => window.location.reload()} 
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            backgroundColor: '#1e293b',
-            color: '#f8fafc',
-            border: '1px solid #334155',
-            padding: '8px 16px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
+            display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#1e293b',
+            color: '#f8fafc', border: '1px solid #334155', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer'
           }}
-          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#334155'}
-          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#1e293b'}
         >
-          <RefreshCw size={18} />
-          Refresh Data
+          <RefreshCw size={18} /> Refresh Data
         </button>
       </div>
 
-      {/* 1. ANOMALY BANNER */}
       {!isHealthy && (
-        <div style={{
-          border: `2px solid ${anomalyColor}`,
-          background: 'rgba(239, 68, 68, 0.15)',
-          borderRadius: 16,
-          padding: '24px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '30px',
-          boxShadow: `0 0 20px ${anomalyColor}33`
-        }}>
+        <div style={{ border: `2px solid ${anomalyColor}`, background: 'rgba(239, 68, 68, 0.15)', borderRadius: 16, padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
             <AlertTriangle size={32} color={anomalyColor} />
             <div>
-              <h3 style={{ color: anomalyColor, margin: 0, fontWeight: 800, fontSize: '1.5rem' }}>ANOMALY DETECTED</h3>
-              <p style={{ color: textMuted, margin: 0 }}>System state identified as FAULTY by Multimodal Fusion.</p>
+              <h3 style={{ color: anomalyColor, margin: 0, fontWeight: 800 }}>ANOMALY DETECTED</h3>
+              <p style={{ color: textMuted, margin: 0 }}>System state identified as FAULTY.</p>
             </div>
           </div>
-          <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#fff' }}>FAULTY</div>
+          <div style={{ fontSize: '2.5rem', fontWeight: 900 }}>FAULTY</div>
         </div>
       )}
 
-      {/* 2. TOP STATUS BAR */}
-      <div style={{
-        backgroundColor: isHealthy ? 'rgba(74, 222, 128, 0.05)' : 'rgba(239, 68, 68, 0.05)',
-        border: `1px solid ${isHealthy ? successColor : anomalyColor}`,
-        borderRadius: 12,
-        padding: "16px 24px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: 'space-between',
-        marginBottom: "30px"
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          {isHealthy ? <CheckCircle size={22} color={successColor}/> : <Zap size={22} color={anomalyColor}/>}
-          <h4 style={{ color: isHealthy ? successColor : anomalyColor, margin: 0, fontSize: '1.2rem' }}>
-            Equipment Operating: {isHealthy ? "Healthy" : "Faulty"}
-          </h4>
-        </div>
-        <div style={{ color: textMuted, fontWeight: 'bold' }}>{latestData.Timestamp}</div>
-      </div>
-
-      {/* 3. METRIC GRID */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
         
-        {/* VIBRATION */}
+        {/* VIBRATION CARD */}
         <MetricCard title="Vibration" icon={<Activity size={20} color="#c084fc"/>} status={isHealthy ? "Healthy" : "Faulty"} statusColor={isHealthy ? successColor : anomalyColor} bgColor={cardBg} chartData={chartLogs?.Vibration || []} lineColor="#c084fc">
           <MetricRow label="RMS" value={latestData.RMS?.toFixed(4)}/>
           <MetricRow label="Kurtosis" value={latestData.Kurtosis?.toFixed(4)}/>
+          <MetricRow label="Skewness" value={latestData.Skewness?.toFixed(4)}/>
           <MetricRow label="Peak Amp" value={latestData.PeakAmp?.toFixed(4)}/>
         </MetricCard>
 
-        {/* ACOUSTIC */}
+        {/* ACOUSTIC CARD - Uses the same shared multimodal keys */}
         <MetricCard title="Acoustic" icon={<Mic size={20} color="#38bdf8"/>} status={isHealthy ? "Healthy" : "Faulty"} statusColor={isHealthy ? successColor : anomalyColor} bgColor={cardBg} chartData={chartLogs?.Acoustic || []} lineColor="#38bdf8">
           <MetricRow label="RMS" value={latestData.RMS?.toFixed(4)}/>
           <MetricRow label="Kurtosis" value={latestData.Kurtosis?.toFixed(4)}/>
+          <MetricRow label="Skewness" value={latestData.Skewness?.toFixed(4)}/>
           <MetricRow label="Peak Amp" value={latestData.PeakAmp?.toFixed(4)}/>
         </MetricCard>
 
-        {/* THERMAL */}
+        {/* THERMAL CARD */}
         <MetricCard title="Thermal" icon={<Thermometer size={20} color="#fb7185"/>} status={isHealthy ? "Healthy" : "Faulty"} statusColor={isHealthy ? successColor : anomalyColor} bgColor={cardBg} chartData={chartLogs?.Thermal || []} lineColor="#fb7185">
           <MetricRow label="Avg Temp" value={latestData.Temperature?.toFixed(4)}/>
           <div style={{ marginTop: 15, height: 4, background: '#334155', borderRadius: 2 }}>
@@ -131,7 +84,6 @@ const Dashboard = ({ latestData, chartLogs, allRows, onSelectData, onDeleteFile,
           </div>
         </MetricCard>
       </div>
-
     </div>
   );
 };
