@@ -1,8 +1,10 @@
 import sys
 import json
+import os
 import numpy as np
 from scipy import stats
 from scipy.io import loadmat
+from nptdms import TdmsFile
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -10,72 +12,84 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, (np.float64, np.float32)): return float(obj)
         return obj
 
-def read_mat(file_path):
+def process_tdms(file_path):
+    """Processes NI FlexLogger TDMS files"""
+    tdms_file = TdmsFile.read(file_path)
+    group = tdms_file['Log']
+    
+    # Target your specific cDAQ Module paths
+    vibration_raw = group['cDAQ9185-1F486B5Mod2/ai0'].data
+    temp_raw = group['cDAQ9185-1F486B5Mod1/ai1'].data
+    
+    return vibration_raw, np.mean(temp_raw), 1.0 
+
+def process_mat(file_path):
+    """Processes Siemens Simcenter .mat files"""
+    mat = loadmat(file_path)
+    signal_struct = mat['Signal'][0, 0]
+    raw_values = signal_struct[1][0, 0][0].astype(float).flatten()
+    
     try:
-        mat = loadmat(file_path)
+        temp_data = signal_struct[1][0, 0]
+        actual_temp = np.mean(temp_data) if temp_data.size > 0 else 0.0
+    except:
+        actual_temp = 0.0
         
-        # Drilling into the Simcenter Testlab nesting
-        signal_struct = mat['Signal'][0, 0]
-        raw_values = signal_struct[1][0, 0][0].astype(float).flatten()
-
-        # Attempting to pull REAL Temperature from the Siemens metadata if available
-        # If the structure differs, it defaults to 0.0 rather than a fake number
-        try:
-            # Checking if there's a second channel or attribute for Temperature
-            temp_data = signal_struct[1][0, 0] # Adjusting index to look for thermal channel
-            actual_temp = np.mean(temp_data) if temp_data.size > 0 else 0.0
-        except:
-            actual_temp = 0.0
-
-        # SETTINGS FROM YOUR DASHBOARD
-        FS = 12000          # 12,000 Hz Sampling Rate
-        WINDOW_SIZE = 400   # 400 Samples per window
-        
-        # SENSITIVITY FACTOR
-        FACTOR = 2306.47
-
-        if raw_values.size >= WINDOW_SIZE:
-            max_peak = -1
-            best_window = None
-
-            for i in range(0, len(raw_values) - WINDOW_SIZE, WINDOW_SIZE):
-                current_window = raw_values[i : i + WINDOW_SIZE]
-                peak = np.max(np.abs(current_window))
-                if peak > max_peak:
-                    max_peak = peak
-                    best_window = current_window
-
-            # Process the chosen window
-            final_sig = (best_window - np.mean(best_window)) * FACTOR
-            
-            # Metrics Calculation
-            calc_rms = np.sqrt(np.mean(final_sig**2))
-            calc_kurt = stats.kurtosis(final_sig, fisher=False) 
-            calc_skew = stats.skew(final_sig)
-            calc_peak = np.max(np.abs(final_sig))
-
-            # --- ADDING STATUS (0/1) ---
-            # Threshold: Kurtosis > 3.0 is the standard industrial limit for bearing health
-            status = 1 if (calc_kurt > 3.0 or abs(calc_skew) > 0.5) else 0
-
-            return {
-                "RMS": float(calc_rms),
-                "Kurtosis": float(calc_kurt),
-                "Skewness": float(calc_skew),
-                "Peak_Amplitude": float(calc_peak),
-                "Temperature": float(actual_temp), # REAL DATA
-                "Status": int(status)              # 0 = Healthy, 1 = Anomaly
-            }
-            
-        return {"error": f"File too small. Need at least {WINDOW_SIZE} samples."}
-    except Exception as e:
-        return {"error": str(e)}
+    return raw_values, actual_temp, 2306.47 
 
 def main():
     if len(sys.argv) < 2: return
     file_path = sys.argv[1]
-    result = read_mat(file_path)
-    print(json.dumps(result, cls=NumpyEncoder))
+    ext = os.path.splitext(file_path)[1].lower()
+
+    try:
+        if ext == '.tdms':
+            raw_signal, temperature, factor = process_tdms(file_path)
+        elif ext == '.mat':
+            raw_signal, temperature, factor = process_mat(file_path)
+        else:
+            print(json.dumps({"error": f"Unsupported extension: {ext}"}))
+            return
+
+        # --- WINDOWING LOGIC ---
+        WINDOW_SIZE = 400
+        if raw_signal.size < WINDOW_SIZE:
+            print(json.dumps({"error": "Data too short"}))
+            return
+
+        # Find best window (highest peak)
+        max_peak = -1
+        best_window = raw_signal[0:WINDOW_SIZE]
+        for i in range(0, len(raw_signal) - WINDOW_SIZE, WINDOW_SIZE):
+            current_window = raw_signal[i : i + WINDOW_SIZE]
+            peak = np.max(np.abs(current_window))
+            if peak > max_peak:
+                max_peak = peak
+                best_window = current_window
+
+        # Process chosen window
+        final_sig = (best_window - np.mean(best_window)) * factor
+
+        # Stats
+        calc_rms = np.sqrt(np.mean(final_sig**2))
+        calc_kurt = stats.kurtosis(final_sig, fisher=False) 
+        calc_skew = stats.skew(final_sig)
+        calc_peak = np.max(np.abs(final_sig))
+
+        # Status Logic (0=Healthy, 1=Anomaly)
+        status = 1 if (calc_kurt > 3.5 or abs(calc_skew) > 0.6) else 0
+
+        print(json.dumps({
+            "RMS": float(calc_rms),
+            "Kurtosis": float(calc_kurt),
+            "Skewness": float(calc_skew),
+            "Peak_Amplitude": float(calc_peak),
+            "Temperature": float(temperature),
+            "Status": int(status)
+        }, cls=NumpyEncoder))
+
+    except Exception as e:
+        print(json.dumps({"error": str(e)}))
 
 if __name__ == "__main__":
     main()
