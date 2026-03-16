@@ -25,13 +25,9 @@ const PORT = process.env.PORT || 5000;
 // FIXED: Explicit CORS configuration to allow your GitHub Pages frontend
 
 app.use(cors({
-
   origin: "https://begin-18.github.io",
-
-  methods: ["GET", "POST"],
-
-  allowedHeaders: ["Content-Type"]
-
+  methods: ["GET", "POST", "OPTIONS"], // Added OPTIONS for pre-flight
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
 
