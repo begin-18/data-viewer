@@ -59,7 +59,6 @@ export default function SheetViewerMultiPaginated() {
 
   // --- FETCHING LOGIC ---
 
-  // Fetch from the 3 original tabs
   async function fetchSheetTab(tabName) {
     const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}`;
     const res = await fetch(url);
@@ -67,7 +66,7 @@ export default function SheetViewerMultiPaginated() {
     return parseGvizText(text);
   }
 
-  // Fetch specifically from New Data Storage for the Dashboard
+  // UPDATED: Fetch specifically from New Data Storage for the Dashboard
   async function fetchDashboardData() {
     try {
       const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=New%20Data%20Storage`;
@@ -77,6 +76,10 @@ export default function SheetViewerMultiPaginated() {
 
       if (rows && rows.length > 0) {
         const lastRow = rows[rows.length - 1];
+        
+        // Match the exact Google Sheet Header "Status (0/1)"
+        const rawStatus = pick(lastRow, ["Status (0/1)", "status", "Status"]);
+
         setLatestData({
           Timestamp: pick(lastRow, ["timestamp", "time"]),
           RMS: parseFloat(pick(lastRow, ["rms"])) || 0,
@@ -84,8 +87,10 @@ export default function SheetViewerMultiPaginated() {
           Skewness: parseFloat(pick(lastRow, ["skewness"])) || 0,
           PeakAmp: parseFloat(pick(lastRow, ["peak amp", "peak_amp"])) || 0,
           Temperature: parseFloat(pick(lastRow, ["temperature", "temp"])) || 0,
-          Status: parseInt(pick(lastRow, ["status"])) || 0
+          // Explicitly map the status to the property Dashboard expects
+          "Status (0/1)": rawStatus 
         });
+
         setChartLogs({
           Vibration: rows.slice(-20).map(r => parseFloat(pick(r, ["rms"])) || 0),
           Thermal: rows.slice(-20).map(r => parseFloat(pick(r, ["temperature"])) || 0),
@@ -144,10 +149,8 @@ export default function SheetViewerMultiPaginated() {
   // --- DATA TRANSFORMATION FOR TABLE ---
 
   const rows = useMemo(() => {
-    // Return empty if we aren't viewing a table
     if (["Dashboard", "Data Upload", "About", "Fault Summary"].includes(activeTab)) return [];
     
-    // Comparison Logic
     if (activeTab === "Vibration × Acoustic") {
       return mergedRows.map(r => ({ timestamp: r.timestamp, vibration_x: r.vibration_x, vibration_y: r.vibration_y, vibration_z: r.vibration_z, acoustic_level: r.acoustic_level, fault_type: r.fault_type }));
     }
@@ -158,7 +161,6 @@ export default function SheetViewerMultiPaginated() {
       return mergedRows;
     }
 
-    // Standard Tab filtering
     return allRows.filter(r => r._tab === activeTab);
   }, [allRows, mergedRows, activeTab]);
 
@@ -188,13 +190,10 @@ export default function SheetViewerMultiPaginated() {
         />
 
         <main style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12, overflowY: "auto" }}>
-          
-          {/* 1. DASHBOARD VIEW */}
           {activeTab === "Dashboard" && (
             <Dashboard latestData={latestData} chartLogs={chartLogs} currentTheme={currentTheme} />
           )}
 
-          {/* 2. TABLE VIEWS (Covers Data Overview & Comparative Analysis) */}
           {[
             "Thermal Data", "Acoustic Data", "Vibration Data", 
             "All Data", "Vibration × Acoustic", 
@@ -214,10 +213,7 @@ export default function SheetViewerMultiPaginated() {
             />
           )}
 
-          {/* 3. UPLOAD ZONE */}
           {activeTab === "Data Upload" && <DataUploadPage currentTheme={currentTheme} />}
-
-          {/* 4. OTHER VIEWS */}
           {activeTab === "Fault Summary" && <FaultSummary allRows={allRows} currentTheme={currentTheme} />}
           {activeTab === "About" && <About currentTheme={currentTheme} />}
         </main>
