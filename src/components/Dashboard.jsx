@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Activity, Thermometer, Mic, AlertTriangle, CheckCircle, 
-  Zap, FileText, Clock, Trash2, XCircle, ChevronRight 
+  Zap, RefreshCw
 } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import {
@@ -37,6 +37,31 @@ const Dashboard = ({ latestData, chartLogs, allRows, onSelectData, onDeleteFile,
   return (
     <div style={{ padding: "30px", backgroundColor: '#0f172a', minHeight: '100vh', color: '#f8fafc' }}>
       
+      {/* HEADER WITH REFRESH BUTTON */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>System Monitor</h2>
+        <button 
+          onClick={() => window.location.reload()} 
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            backgroundColor: '#1e293b',
+            color: '#f8fafc',
+            border: '1px solid #334155',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#334155'}
+          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#1e293b'}
+        >
+          <RefreshCw size={18} />
+          Refresh Data
+        </button>
+      </div>
+
       {/* 1. ANOMALY BANNER */}
       {!isHealthy && (
         <div style={{
@@ -82,7 +107,7 @@ const Dashboard = ({ latestData, chartLogs, allRows, onSelectData, onDeleteFile,
       </div>
 
       {/* 3. METRIC GRID */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '40px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
         
         {/* VIBRATION */}
         <MetricCard title="Vibration" icon={<Activity size={20} color="#c084fc"/>} status={isHealthy ? "Healthy" : "Faulty"} statusColor={isHealthy ? successColor : anomalyColor} bgColor={cardBg} chartData={chartLogs?.Vibration || []} lineColor="#c084fc">
@@ -90,7 +115,7 @@ const Dashboard = ({ latestData, chartLogs, allRows, onSelectData, onDeleteFile,
           <MetricRow label="Kurtosis" value={latestData.Kurtosis?.toFixed(4)}/>
         </MetricCard>
 
-        {/* ACOUSTIC (NOW ADDED) */}
+        {/* ACOUSTIC */}
         <MetricCard title="Acoustic" icon={<Mic size={20} color="#38bdf8"/>} status={isHealthy ? "Healthy" : "Faulty"} statusColor={isHealthy ? successColor : anomalyColor} bgColor={cardBg} chartData={chartLogs?.Acoustic || []} lineColor="#38bdf8">
           <MetricRow label="Acoustic Level" value={latestData.Acoustic?.toFixed(4)}/>
           <MetricRow label="Peak Amp" value={latestData.PeakAmp?.toFixed(4)}/>
@@ -104,25 +129,7 @@ const Dashboard = ({ latestData, chartLogs, allRows, onSelectData, onDeleteFile,
           </div>
         </MetricCard>
       </div>
-      
-      {/* 4. HISTORY SECTION */}
-      <div style={{ background: cardBg, borderRadius: 20, padding: '30px', border: `1px solid #334155` }}>
-        <h3 style={{ marginBottom: 20 }}>Analysis Repository</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {allRows?.slice(0, 10).map((row, index) => {
-            const rowVal = row["Status"] ?? row["Status (0/1)"];
-            const isRowHealthy = String(rowVal).trim() === "0" || rowVal === 0;
-            return (
-              <div key={index} style={{ display: 'flex', justifyContent: 'space-between', padding: 16, background: 'rgba(15, 23, 42, 0.3)', borderRadius: 12, border: `1px solid ${isRowHealthy ? '#334155' : anomalyColor}` }}>
-                <span>{row.timestamp}</span>
-                <span style={{ color: isRowHealthy ? successColor : anomalyColor, fontWeight: 'bold' }}>
-                  {isRowHealthy ? 'Healthy' : 'Faulty'}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+
     </div>
   );
 };
