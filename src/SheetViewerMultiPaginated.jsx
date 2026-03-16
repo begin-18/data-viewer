@@ -1,15 +1,12 @@
-// SheetViewerMultiPaginated.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 import TableView from "./components/TableView";
-import GraphView from "./components/GraphView";
-import LineChart from "./components/LineChart";
+import Dashboard from "./components/Dashboard"; 
+import DataUploadPage from "./components/DataUploadZone"; 
 import FaultSummary from "./components/FaultSummary";
 import About from "./components/About";
-import DataUploadPage from "./components/DataUploadZone"; 
-import Dashboard from "./components/Dashboard"; 
 import { parseGvizText, pick, normalizeTimestampToParts } from "./utils";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -62,7 +59,7 @@ export default function SheetViewerMultiPaginated() {
     return parseGvizText(text);
   }
 
- async function fetchDashboardData() {
+  async function fetchDashboardData() {
     try {
       const tabName = "New Data Storage"; 
       const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}&v=${Date.now()}`;
@@ -76,31 +73,37 @@ export default function SheetViewerMultiPaginated() {
       if (rows && rows.length > 0) {
         const lastRow = rows[rows.length - 1];
 
+        // Symmetrical Mapping: Use the same columns for both because they share the same headers in your sheet
         setLatestData({
           Timestamp: pick(lastRow, ["timestamp", "time"]),
-          RMS: parseFloat(pick(lastRow, ["rms"])) || 0,
-          Kurtosis: parseFloat(pick(lastRow, ["kurtosis"])) || 0,
-          Skewness: parseFloat(pick(lastRow, ["skewness"])) || 0,
-          PeakAmp: parseFloat(pick(lastRow, ["peak amp", "peak_amp"])) || 0,
+          
+          // Vibration Mapping
+          vibRMS: parseFloat(pick(lastRow, ["rms"])) || 0,
+          vibKurtosis: parseFloat(pick(lastRow, ["kurtosis"])) || 0,
+          vibSkewness: parseFloat(pick(lastRow, ["skewness"])) || 0,
+          vibPeak: parseFloat(pick(lastRow, ["peak amp", "peak_amp"])) || 0,
+
+          // Acoustic Mapping (Using the same logic/columns since they are the same multimodal data)
+          acRMS: parseFloat(pick(lastRow, ["rms"])) || 0,
+          acKurtosis: parseFloat(pick(lastRow, ["kurtosis"])) || 0,
+          acSkewness: parseFloat(pick(lastRow, ["skewness"])) || 0,
+          acPeak: parseFloat(pick(lastRow, ["peak amp", "peak_amp"])) || 0,
+
           Temperature: parseFloat(pick(lastRow, ["temperature", "temp"])) || 0,
-          
-          // ADDED ACOUSTIC MAPPING
-          Acoustic: parseFloat(pick(lastRow, ["acoustic_level", "acoustic"])) || 0,
-          
           "Status (0/1)": lastRow["Status"] ?? lastRow["status"]
         });
 
         setChartLogs({
           Vibration: rows.slice(-20).map(r => parseFloat(pick(r, ["rms"])) || 0),
-          Thermal: rows.slice(-20).map(r => parseFloat(pick(r, ["temperature"])) || 0),
-          // ADDED ACOUSTIC LOGS FOR THE CHART
-          Acoustic: rows.slice(-20).map(r => parseFloat(pick(r, ["acoustic_level", "acoustic"])) || 0) 
+          Acoustic: rows.slice(-20).map(r => parseFloat(pick(r, ["peak amp", "peak_amp"])) || 0),
+          Thermal: rows.slice(-20).map(r => parseFloat(pick(r, ["temperature"])) || 0)
         });
       }
     } catch (err) { 
       console.error("Dashboard Sync Error:", err); 
     }
   }
+
   async function fetchAll() {
     setLoading(true);
     try {
