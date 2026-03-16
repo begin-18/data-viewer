@@ -21,10 +21,8 @@ const Dashboard = ({ latestData, chartLogs, allRows, onSelectData, onDeleteFile,
     );
   }
 
-  // --- UPDATED IF/ELSE LOGIC ---
+  // --- STATUS LOGIC ---
   const statusValue = latestData["Status (0/1)"]; 
-  
-  // Logic: 0 = Healthy, 1 (or anything else) = Faulty
   const isHealthy = statusValue !== undefined && (
     statusValue === 0 || 
     statusValue === "0" || 
@@ -39,7 +37,7 @@ const Dashboard = ({ latestData, chartLogs, allRows, onSelectData, onDeleteFile,
   return (
     <div style={{ padding: "30px", backgroundColor: '#0f172a', minHeight: '100vh', color: '#f8fafc' }}>
       
-      {/* 1. ANOMALY BANNER: Only shows when isHealthy is FALSE (Status 1) */}
+      {/* 1. ANOMALY BANNER */}
       {!isHealthy && (
         <div style={{
           border: `2px solid ${anomalyColor}`,
@@ -85,11 +83,20 @@ const Dashboard = ({ latestData, chartLogs, allRows, onSelectData, onDeleteFile,
 
       {/* 3. METRIC GRID */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '40px' }}>
+        
+        {/* VIBRATION */}
         <MetricCard title="Vibration" icon={<Activity size={20} color="#c084fc"/>} status={isHealthy ? "Healthy" : "Faulty"} statusColor={isHealthy ? successColor : anomalyColor} bgColor={cardBg} chartData={chartLogs?.Vibration || []} lineColor="#c084fc">
           <MetricRow label="RMS" value={latestData.RMS?.toFixed(4)}/>
           <MetricRow label="Kurtosis" value={latestData.Kurtosis?.toFixed(4)}/>
         </MetricCard>
 
+        {/* ACOUSTIC (NOW ADDED) */}
+        <MetricCard title="Acoustic" icon={<Mic size={20} color="#38bdf8"/>} status={isHealthy ? "Healthy" : "Faulty"} statusColor={isHealthy ? successColor : anomalyColor} bgColor={cardBg} chartData={chartLogs?.Acoustic || []} lineColor="#38bdf8">
+          <MetricRow label="Acoustic Level" value={latestData.Acoustic?.toFixed(4)}/>
+          <MetricRow label="Peak Amp" value={latestData.PeakAmp?.toFixed(4)}/>
+        </MetricCard>
+
+        {/* THERMAL */}
         <MetricCard title="Thermal" icon={<Thermometer size={20} color="#fb7185"/>} status={isHealthy ? "Healthy" : "Faulty"} statusColor={isHealthy ? successColor : anomalyColor} bgColor={cardBg} chartData={chartLogs?.Thermal || []} lineColor="#fb7185">
           <MetricRow label="Avg Temp" value={latestData.Temperature?.toFixed(4)}/>
           <div style={{ marginTop: 15, height: 4, background: '#334155', borderRadius: 2 }}>

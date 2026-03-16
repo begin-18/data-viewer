@@ -62,7 +62,7 @@ export default function SheetViewerMultiPaginated() {
     return parseGvizText(text);
   }
 
-  async function fetchDashboardData() {
+ async function fetchDashboardData() {
     try {
       const tabName = "New Data Storage"; 
       const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}&v=${Date.now()}`;
@@ -84,21 +84,23 @@ export default function SheetViewerMultiPaginated() {
           PeakAmp: parseFloat(pick(lastRow, ["peak amp", "peak_amp"])) || 0,
           Temperature: parseFloat(pick(lastRow, ["temperature", "temp"])) || 0,
           
-          // STRICT MAPPING: Looks for 'Status' exactly as in your image
-          "Status (0/1)": lastRow["Status"] !== undefined ? lastRow["Status"] : lastRow["status"]
+          // ADDED ACOUSTIC MAPPING
+          Acoustic: parseFloat(pick(lastRow, ["acoustic_level", "acoustic"])) || 0,
+          
+          "Status (0/1)": lastRow["Status"] ?? lastRow["status"]
         });
 
         setChartLogs({
           Vibration: rows.slice(-20).map(r => parseFloat(pick(r, ["rms"])) || 0),
           Thermal: rows.slice(-20).map(r => parseFloat(pick(r, ["temperature"])) || 0),
-          Acoustic: rows.slice(-20).map(r => parseFloat(pick(r, ["acoustic_level"])) || 0) 
+          // ADDED ACOUSTIC LOGS FOR THE CHART
+          Acoustic: rows.slice(-20).map(r => parseFloat(pick(r, ["acoustic_level", "acoustic"])) || 0) 
         });
       }
     } catch (err) { 
       console.error("Dashboard Sync Error:", err); 
     }
   }
-
   async function fetchAll() {
     setLoading(true);
     try {
