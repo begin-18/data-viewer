@@ -54,7 +54,9 @@ export default function SheetViewerMultiPaginated() {
   const handleClearData = async () => {
     if (!window.confirm("Permanently delete all data from Google Sheets?")) return;
     try {
-      const res = await fetch('http://localhost:5000/api/clear-sheets', { method: 'POST' });
+      const res = await fetch('https://thesis-backend-aukn.onrender.com/api/clear-sheets', { 
+  method: 'POST' 
+});
       if (res.ok) {
         setIsDashboardCleared(true);
         setLatestData({ vibration: null, acoustic: null, thermal: null, global: null });

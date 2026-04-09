@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { Trash2, Database, ChevronRight, LayoutGrid } from 'lucide-react';
 
+// Define the API URL once at the top
+const API_BASE_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:5000' 
+  : 'https://thesis-backend-aukn.onrender.com';
+
 const DropZone = ({ onNavigate, onUploadSuccess }) => {
   const [status, setStatus] = useState('');
   const [msg, setMsg] = useState('');
@@ -55,11 +60,13 @@ const DropZone = ({ onNavigate, onUploadSuccess }) => {
     setMsg("Sending data to Google Sheets...");
 
     try {
+      // Loop through each file and upload
       for (const fileObj of uploadedFiles) {
         const fd = new FormData();
         fd.append('file', fileObj.file);
         fd.append('mapping', fileObj.type);
-        await axios.post('http://localhost:5000/api/upload-data', fd);
+        
+        await axios.post(`${API_BASE_URL}/api/upload-data`, fd);
       }
       
       setStatus('success');
@@ -127,7 +134,6 @@ const DropZone = ({ onNavigate, onUploadSuccess }) => {
                     borderRadius: '12px', 
                     border: '1px solid #334155',
                   }}>
-                    {/* FIXED WIDTH CONTAINER FOR NAME - prevents pushing dropdown to the right */}
                     <div style={{ width: '60%', minWidth: '0', flexShrink: 0 }}>
                       <span style={{ 
                         color: '#f8fafc', 
@@ -139,10 +145,8 @@ const DropZone = ({ onNavigate, onUploadSuccess }) => {
                       }}>
                         {file.name}
                       </span>
-             
                     </div>
                     
-                    {/* CONTROLS SECTION - aligned right but closer to the center */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto' }}>
                       <div style={{ 
                         background: '#0f172a', 
