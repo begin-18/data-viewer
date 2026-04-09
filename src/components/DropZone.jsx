@@ -1,126 +1,213 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { Trash2, Database, ChevronRight, LayoutGrid } from 'lucide-react';
 
-const API_URL = 'https://thesis-data-gl06.onrender.com/api/upload-data';
+const DropZone = ({ onNavigate, onUploadSuccess }) => {
+  const [status, setStatus] = useState('');
+  const [msg, setMsg] = useState('');
+  const [uploadedFiles, setUploadedFiles] = useState([]);
 
-// Added currentTheme to props
-const DropZone = ({ dataType, allowedExtensions, currentTheme }) => {
-    const [dragging, setDragging] = useState(false);
-    const [file, setFile] = useState(null);
-    const [status, setStatus] = useState(''); 
-    const [message, setMessage] = useState('');
+  const handleFileSelect = (file) => {
+    if (!file) return;
 
-    // Logic for colors based on theme
-    const isDark = currentTheme?.isDark || false; 
-    const bgColor = dragging 
-        ? (isDark ? 'rgba(59, 130, 246, 0.2)' : '#f0f8ff') 
-        : (currentTheme?.cardBg || '#f9f9f9');
+    if (uploadedFiles.length >= 3) {
+      setMsg("Maximum of 3 files reached. Please remove one to add another.");
+      setStatus('error');
+      return;
+    }
+
+    const isMatFile = file.name.toLowerCase().endsWith('.mat');
+    const usedTypes = uploadedFiles.map(f => f.type);
     
-    const textColor = currentTheme?.textColor || '#333';
-    const borderColor = dragging ? '#3b82f6' : (currentTheme?.borderColor || '#ccc');
+    if (isMatFile && usedTypes.includes('Vibration') && usedTypes.includes('Acoustic')) {
+      setMsg("Cannot add .mat file: Vibration and Acoustic slots are full, and .mat does not support Thermal.");
+      setStatus('error');
+      return;
+    }
 
-    const handleFileDrop = (droppedFile) => {
-        if (!droppedFile) return;
-        const extension = droppedFile.name.split('.').pop().toLowerCase();
-        
-        setStatus('');
-        setMessage('');
-        
-        if (!allowedExtensions.includes(extension)) {
-            setStatus('error');
-            setMessage(`Invalid file type: .${extension}. Expected: ${allowedExtensions.join(', ')}.`);
-            setFile(null);
-            return;
-        }
+    setMsg("");
+    setStatus('');
 
-        setFile(droppedFile);
-        setMessage(`File selected: ${droppedFile.name}. Attempting upload...`);
-        uploadFile(droppedFile); 
+    let defaultType = 'Vibration';
+    if (usedTypes.includes('Vibration')) defaultType = 'Acoustic';
+    if (usedTypes.includes('Vibration') && usedTypes.includes('Acoustic')) {
+      defaultType = isMatFile ? null : 'Thermal';
+    }
+
+    const newFile = {
+      id: Date.now(),
+      file: file,
+      name: file.name,
+      type: defaultType,
+      isMat: isMatFile
     };
 
-    const uploadFile = async (fileToUpload) => {
-        setStatus('loading');
-        const formData = new FormData();
-        formData.append('file', fileToUpload);
-        formData.append('dataType', dataType); 
+    setUploadedFiles(prev => [...prev, newFile]);
+  };
 
-        try {
-            const response = await axios.post(API_URL, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            });
-            setStatus('success');
-            setFile(null);
-            setMessage(response.data.message || `Successfully uploaded ${fileToUpload.name}.`);
-        } catch (error) {
-            setStatus('error');
-            let errorMessage = 'Upload failed.';
-            if (error.response) {
-                errorMessage = `Server Error (${error.response.status}): ${error.response.data?.message || 'Check logs'}`;
-            } else if (error.request) {
-                errorMessage = 'No response from server. Check network.';
-            }
-            setMessage(errorMessage);
-        }
-    };
+  const handleFuseAndUpload = async () => {
+    if (uploadedFiles.length === 0) {
+      onNavigate("Dashboard");
+      return;
+    }
 
-    const StatusIndicator = () => {
-        if (status === 'loading') return <div style={{ color: '#3b82f6', marginTop: '10px', fontSize: '13px' }}>⏳ {message}</div>;
-        if (status === 'success') return <div style={{ color: '#10b981', marginTop: '10px', fontSize: '13px' }}>✅ {message}</div>;
-        if (status === 'error') return <div style={{ color: '#ef4444', marginTop: '10px', fontSize: '13px' }}>❌ {message}</div>;
-        return null;
-    };
+    setStatus('loading');
+    setMsg("Sending data to Google Sheets...");
 
-    return (
+    try {
+      for (const fileObj of uploadedFiles) {
+        const fd = new FormData();
+        fd.append('file', fileObj.file);
+        fd.append('mapping', fileObj.type);
+        await axios.post('http://localhost:5000/api/upload-data', fd);
+      }
+      
+      setStatus('success');
+      setMsg("All modalities fused and uploaded!");
+      if (onUploadSuccess) onUploadSuccess();
+      setTimeout(() => onNavigate("Dashboard"), 1000);
+    } catch (e) {
+      setStatus('error');
+      setMsg(e.response?.data?.error || "Check Local API Connection");
+    }
+  };
+
+  const removeFile = (id) => {
+    setUploadedFiles(prev => prev.filter(f => f.id !== id));
+    setMsg(""); 
+    setStatus('');
+  };
+
+  const updateFileType = (id, newType) => {
+    setUploadedFiles(prev => prev.map(f => f.id === id ? { ...f, type: newType } : f));
+  };
+
+  return (
+    <div style={{ width: '100%', maxWidth: '900px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+      <div style={{ backgroundColor: '#1e293b', borderRadius: '16px', padding: '24px', marginBottom: '24px', border: '1px solid #334155' }}>
         <div 
-            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => { e.preventDefault(); setDragging(false); handleFileDrop(e.dataTransfer.files[0]); }}
-            style={{
-                border: `2px dashed ${borderColor}`,
-                padding: '30px 20px',
-                textAlign: 'center',
-                margin: '15px 0',
-                borderRadius: '15px',
-                backgroundColor: bgColor,
-                transition: 'all 0.3s ease',
-                boxShadow: isDark ? '0 4px 15px rgba(0,0,0,0.3)' : '0 4px 10px rgba(0,0,0,0.05)'
-            }}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => { e.preventDefault(); handleFileSelect(e.dataTransfer.files[0]); }}
+          style={{ 
+            border: status === 'loading' ? '2px dashed #a78bfa' : '2px dashed #334155', 
+            padding: '30px', textAlign: 'center', borderRadius: '16px',
+            backgroundColor: status === 'loading' ? 'rgba(167, 139, 250, 0.05)' : '#0f172a',
+            marginBottom: '24px', cursor: 'pointer'
+          }}
         >
-            <h3 style={{ margin: '0 0 8px 0', color: textColor, fontSize: '16px', fontWeight: '800' }}>
-                {dataType}
-            </h3>
-            
-            <p style={{ color: textColor, opacity: 0.7, fontSize: '13px', marginBottom: '15px' }}>
-                
-            </p>
-
-            <input 
-                type="file" 
-                onChange={(e) => handleFileDrop(e.target.files[0])} 
-                style={{ display: 'none' }} 
-                id={`file-upload-${dataType}`}
-                accept={allowedExtensions.map(ext => `.${ext}`).join(',')}
-            />
-            
-            <label 
-                htmlFor={`file-upload-${dataType}`} 
-                style={{ 
-                    cursor: 'pointer', 
-                    color: '#3b82f6', 
-                    fontWeight: 'bold', 
-                    fontSize: '14px',
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    background: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)',
-                    border: '1px solid rgba(59, 130, 246, 0.2)'
-                }}
-            >
-                Browse File
-            </label>
-            
-            <StatusIndicator />
+          <input type="file" onChange={(e) => handleFileSelect(e.target.files[0])} style={{ display: 'none' }} id="mat-in" />
+          <label htmlFor="mat-in" style={{ cursor: 'pointer', display: 'block' }}>
+              <div style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                {status === 'loading' ? '⚡ UPLOADING...' : 'CLICK OR DRAG .MAT & .TDMS FILES'}
+              </div>
+              <div style={{ fontSize: '13px', color: status === 'error' ? '#ef4444' : '#64748b', marginTop: '8px' }}>
+                {msg || "Assign each file a unique modality (Max 3 Files)"}
+              </div>
+          </label>
         </div>
-    );
+
+        <div style={{ backgroundColor: '#0f172a', borderRadius: '16px', padding: '24px', marginBottom: '24px', border: '1px solid #334155' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+            <Database size={18} color="#94a3b8" />
+            <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '1rem', fontWeight: 600 }}>File Configuration ({uploadedFiles.length}/3)</h3>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {uploadedFiles.map((file) => {
+                const otherSelectedTypes = uploadedFiles
+                  .filter(f => f.id !== file.id)
+                  .map(f => f.type);
+
+                return (
+                  <div key={file.id} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    backgroundColor: '#1e293b', 
+                    padding: '12px 16px', 
+                    borderRadius: '12px', 
+                    border: '1px solid #334155',
+                  }}>
+                    {/* FIXED WIDTH CONTAINER FOR NAME - prevents pushing dropdown to the right */}
+                    <div style={{ width: '60%', minWidth: '0', flexShrink: 0 }}>
+                      <span style={{ 
+                        color: '#f8fafc', 
+                        fontWeight: 600, 
+                        display: 'block', 
+                        whiteSpace: 'nowrap', 
+                        overflow: 'hidden', 
+                        textOverflow: 'ellipsis' 
+                      }}>
+                        {file.name}
+                      </span>
+             
+                    </div>
+                    
+                    {/* CONTROLS SECTION - aligned right but closer to the center */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto' }}>
+                      <div style={{ 
+                        background: '#0f172a', 
+                        padding: '4px 8px', 
+                        borderRadius: '8px', 
+                        border: '1px solid #334155', 
+                        display: 'flex', 
+                        alignItems: 'center' 
+                      }}>
+                        <span style={{ color: '#64748b', fontSize: '0.75rem', marginRight: '8px' }}>Map To:</span>
+                        <select 
+                          value={file.type} 
+                          onChange={(e) => updateFileType(file.id, e.target.value)}
+                          style={{ 
+                            background: 'none', 
+                            border: 'none', 
+                            color: '#a78bfa', 
+                            fontWeight: 700, 
+                            cursor: 'pointer', 
+                            outline: 'none' 
+                          }}
+                        >
+                          <option value="Vibration" disabled={otherSelectedTypes.includes("Vibration")}>
+                            Vibration
+                          </option>
+                          <option value="Acoustic" disabled={otherSelectedTypes.includes("Acoustic")}>
+                            Acoustic
+                          </option>
+                          {!file.isMat && (
+                            <option value="Thermal" disabled={otherSelectedTypes.includes("Thermal")}>
+                              Thermal
+                            </option>
+                          )}
+                        </select>
+                      </div>
+                      <button 
+                        onClick={() => removeFile(file.id)} 
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      </div>
+
+      <button 
+        onClick={handleFuseAndUpload}
+        disabled={status === 'loading' || uploadedFiles.some(f => !f.type)}
+        style={{ 
+          width: '100%', padding: '16px', borderRadius: '12px', border: 'none', 
+          backgroundColor: status === 'loading' ? '#475569' : '#10b981', color: '#fff', 
+          fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', 
+          gap: '12px', cursor: 'pointer', fontSize: '1rem'
+        }}
+      >
+        <LayoutGrid size={20} />
+        {status === 'loading' ? 'PROCESSING...' : (uploadedFiles.length > 0 ? `FUSE ${uploadedFiles.length} MODALITIES & UPLOAD` : 'GO TO DASHBOARD')}
+        <ChevronRight size={20} />
+      </button>
+    </div>
+  );
 };
 
 export default DropZone;

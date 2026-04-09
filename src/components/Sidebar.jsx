@@ -1,13 +1,12 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { LayoutDashboard, Database, BarChart3, AlertTriangle, Settings, UserCircle, Target, Layers } from "lucide-react";
+import { LayoutDashboard, Database, BarChart3, AlertTriangle, UserCircle, Target, Layers, Home } from "lucide-react";
 
 export default function Sidebar({ activeTab, setActiveTab, currentTheme, isUserAdmin }) {
   const mainTabs = ["Dashboard", "Data Logs", "Analyses", "Fault Summary", "Data Upload"];
   
   const subTabsDataLogs = ["Thermal Data", "Acoustic Data", "Vibration Data"];
   
-  // These must match the strings in your SheetViewer logic exactly
   const subTabsComparisons = [
     "Vibration × Acoustic", 
     "Vibration × Thermal", 
@@ -15,6 +14,9 @@ export default function Sidebar({ activeTab, setActiveTab, currentTheme, isUserA
   ];
 
   const [openSubMenu, setOpenSubMenu] = useState(null); 
+
+  // Defined common fonts to ensure inheritance
+  const uiFont = "'Inter', -apple-system, system-ui, sans-serif";
 
   const linkButtonStyle = (tab, isSubItem = false) => ({
     width: "100%",
@@ -28,11 +30,13 @@ export default function Sidebar({ activeTab, setActiveTab, currentTheme, isUserA
     color: activeTab === tab ? "#2563eb" : currentTheme.textColor,
     transition: "all 0.2s",
     fontSize: isSubItem ? 13 : 15,
+    fontFamily: uiFont, // Added explicit font family here
     display: "flex",
     alignItems: "center",
     gap: isSubItem ? 8 : 12,
     textDecoration: "none",
-    marginBottom: 2
+    marginBottom: 2,
+    boxSizing: "border-box" // Ensures padding doesn't affect width
   });
 
   const handleSubTabClick = (tabName) => {
@@ -53,10 +57,15 @@ export default function Sidebar({ activeTab, setActiveTab, currentTheme, isUserA
       top: 0,
       overflowY: "auto"
     }}>
-      {/* Brand */}
-    
 
       <nav style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
+        
+        {/* HOME / BACK BUTTON - Now with explicit font styling */}
+        <Link to="/" style={linkButtonStyle("Home")}>
+          <Home size={18}/>
+          <span style={{ fontFamily: uiFont }}>Home</span>
+        </Link>
+
         {mainTabs.map(tab => (
           <div key={tab}>
             
