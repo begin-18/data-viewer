@@ -3,6 +3,7 @@ services:
     name: thesis-backend
     env: node
     plan: free
+    rootDir: data-api  # <--- ADD THIS LINE
     buildCommand: npm install && pip install -r requirements.txt
     startCommand: node server.js
     envVars:
