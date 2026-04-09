@@ -3,9 +3,8 @@ import axios from 'axios';
 import { Trash2, Database, ChevronRight, LayoutGrid } from 'lucide-react';
 
 // Define the API URL once at the top
-const API_BASE_URL = window.location.hostname === 'localhost' 
-  ? 'http://localhost:5000' 
-  : 'https://thesis-backend-aukn.onrender.com';
+// Change this in your DropZone.jsx or App.jsx
+const API_BASE_URL = 'https://thesis-backend-aukn.onrender.com';
 
 const DropZone = ({ onNavigate, onUploadSuccess }) => {
   const [status, setStatus] = useState('');
